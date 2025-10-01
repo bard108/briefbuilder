@@ -190,13 +190,13 @@ const StartPage = ({ onSelectRole }) => (
             <p className="text-gray-600 mb-8">Who is creating this document?</p>
             <div className="space-y-4">
                  <button onClick={() => onSelectRole('Client')} className="w-full px-6 py-3 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 transition-colors shadow-sm text-lg">
-                    I'm a Client
+                    I&apos;m a Client
                 </button>
                  <button onClick={() => onSelectRole('Photographer')} className="w-full px-6 py-3 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 transition-colors shadow-sm text-lg">
-                    I'm a Photographer
+                    I&apos;m a Photographer
                 </button>
                  <button onClick={() => onSelectRole('Producer')} className="w-full px-6 py-3 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 transition-colors shadow-sm text-lg">
-                    I'm a Producer
+                    I&apos;m a Producer
                 </button>
             </div>
         </div>
@@ -280,7 +280,7 @@ const LocationShootDateStep = ({ data, updateData }) => (
 );
 
 const MoodboardStep = ({ data, updateData }) => {
-    const files = data.moodboardFiles || [];
+    const files = useMemo(() => data.moodboardFiles || [], [data.moodboardFiles]);
 
     const previews = useMemo(() => files.map(file => URL.createObjectURL(file)), [files]);
 
@@ -338,6 +338,7 @@ const MoodboardStep = ({ data, updateData }) => {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         {previews.map((previewUrl, index) => (
                             <div key={index} className="relative group">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img src={previewUrl} alt={`preview ${index}`} className="h-28 w-full object-cover rounded-md" />
                                 <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all flex items-center justify-center">
                                     <button onClick={() => removeFile(index)} className="p-2 bg-white rounded-full text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -494,7 +495,7 @@ const ShotListStep = ({ data, updateData }) => {
                         <Input id={`shot-notes-${shot.id}`} label="Notes (Props, Lighting, etc.)" placeholder="e.g., Use natural side light, include fresh herbs as props." value={shot.notes} onChange={(e) => handleShotChange(shot.id, 'notes', e.target.value)} />
                         <div className="flex items-center">
                             <input id={`shot-priority-${shot.id}`} type="checkbox" className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked={shot.priority} onChange={(e) => handleShotChange(shot.id, 'priority', e.target.checked)} />
-                            <label htmlFor={`shot-priority-${shot.id}`} className="ml-2 block text-sm text-gray-900">Mark as "must-have" shot</label>
+                            <label htmlFor={`shot-priority-${shot.id}`} className="ml-2 block text-sm text-gray-900">Mark as &quot;must-have&quot; shot</label>
                         </div>
                     </div>
                 ))}
@@ -606,11 +607,11 @@ const ReviewStep = ({ data, scriptsLoaded }) => {
             const ratio = canvasWidth / canvasHeight;
             let width = pdfWidth;
             let height = width / ratio;
-            let position = 0;
+            const position = 0;
 
             if (height > pdfHeight) {
                 height = pdfHeight;
-                width = height * ratio;
+                // width = height * ratio; // This line is not needed and might cause issues
             }
             
             pdf.addImage(imgData, 'PNG', 0, position, width, height);
@@ -658,7 +659,7 @@ const ReviewStep = ({ data, scriptsLoaded }) => {
         <>
             <div className="space-y-6">
                 <h2 className="text-2xl font-bold text-gray-800">Review & Distribute</h2>
-                <p className="text-gray-600">Please review all the details below. Once you're happy, choose how you'd like to share or save the document.</p>
+                <p className="text-gray-600">Please review all the details below. Once you&apos;re happy, choose how you&apos;d like to share or save the document.</p>
                 <div id="brief-content-for-pdf" ref={briefContentRef} className="space-y-8 p-6 bg-white rounded-lg border border-gray-200">
                     {Object.entries(data).map(([key, value]) => {
                         if (!value || (Array.isArray(value) && value.length === 0)) return null;
@@ -925,3 +926,4 @@ export default function BriefBuilder() {
         </div>
     );
 }
+
