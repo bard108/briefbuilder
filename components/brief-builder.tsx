@@ -125,13 +125,13 @@ const SparklesIcon = ({ className }: { className: string }) => (
 
 // --- API HELPER ---
 // This function calls the Gemini API.
-async function callGeminiAPI(prompt: string, jsonSchema: Record<string, any> | null = null) {
+async function callGeminiAPI(prompt: string, jsonSchema: Record<string, unknown> | null = null) {
   const apiKey = ""; // This will be handled by the environment.
   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
 
   const payload: {
     contents: { parts: { text: string }[] }[];
-    generationConfig?: { responseMimeType: string; responseSchema: Record<string, any> };
+    generationConfig?: { responseMimeType: string; responseSchema: Record<string, unknown> };
   } = {
     contents: [{ parts: [{ text: prompt }] }],
   };
@@ -260,7 +260,7 @@ const StartPage = ({ onSelectRole }: { onSelectRole: (role: string) => void }) =
     </div>
 );
 
-const ProjectDetailsStep = ({ data, updateData }: { data: FormData, updateData: (key: string, value: any) => void }) => {
+const ProjectDetailsStep = ({ data, updateData }: { data: FormData, updateData: (key: keyof FormData, value: FormData[keyof FormData]) => void }) => {
     const [isLoading, setIsLoading] = useState(false);
 
     const generateIdeas = async () => {
@@ -272,7 +272,6 @@ const ProjectDetailsStep = ({ data, updateData }: { data: FormData, updateData: 
         const prompt = `Based on the project name "${data.projectName}", generate a concise, one-paragraph project overview and a short, bulleted list of 3-4 key objectives for a photography brief. Format the output as plain text.`;
         const result = await callGeminiAPI(prompt);
         if (result) {
-            // Simple parsing assuming "Overview:" and "Objectives:" headers
             const overviewMatch = result.match(/Overview:([\s\S]*?)Objectives:/);
             const objectivesMatch = result.match(/Objectives:([\s\S]*)/);
             
@@ -311,7 +310,7 @@ const ProjectDetailsStep = ({ data, updateData }: { data: FormData, updateData: 
     );
 };
 
-const ContactStep = ({ data, updateData }: { data: FormData, updateData: (key: string, value: any) => void }) => (
+const ContactStep = ({ data, updateData }: { data: FormData, updateData: (key: keyof FormData, value: FormData[keyof FormData]) => void }) => (
     <div className="space-y-6">
         <h2 className="text-2xl font-bold text-gray-800">Your Contact Information</h2>
         <p className="text-gray-600">How can the creative team get in touch with you to discuss this inquiry?</p>
@@ -324,7 +323,7 @@ const ContactStep = ({ data, updateData }: { data: FormData, updateData: (key: s
     </div>
 );
 
-const LocationShootDateStep = ({ data, updateData }: { data: FormData, updateData: (key: string, value: any) => void }) => (
+const LocationShootDateStep = ({ data, updateData }: { data: FormData, updateData: (key: keyof FormData, value: FormData[keyof FormData]) => void }) => (
      <div className="space-y-6">
         <h2 className="text-2xl font-bold text-gray-800">Shoot Dates & Location</h2>
         <p className="text-gray-600">Provide the planned dates and location details for the shoot.</p>
@@ -336,7 +335,7 @@ const LocationShootDateStep = ({ data, updateData }: { data: FormData, updateDat
     </div>
 );
 
-const MoodboardStep = ({ data, updateData }: { data: FormData, updateData: (key: string, value: any) => void }) => {
+const MoodboardStep = ({ data, updateData }: { data: FormData, updateData: (key: keyof FormData, value: FormData[keyof FormData]) => void }) => {
     const files = useMemo(() => data.moodboardFiles || [], [data.moodboardFiles]);
 
     const previews = useMemo(() => files.map((file: File) => URL.createObjectURL(file)), [files]);
@@ -431,8 +430,8 @@ const DeliverablesStep = ({ data, updateData }: { data: FormData, updateData: (k
         { id: 'twitterPost', label: 'X / Twitter Post' }, { id: 'otherSocial', label: 'Other' },
     ];
 
-    const handleCheckboxChange = (group: string, id: string) => {
-        const currentSelection = data[group as keyof FormData] as string[] || [];
+    const handleCheckboxChange = (group: keyof FormData, id: string) => {
+        const currentSelection = data[group] as string[] || [];
         const newSelection = currentSelection.includes(id) ? currentSelection.filter((item: string) => item !== id) : [...currentSelection, id];
         updateData(group, newSelection);
     };
@@ -466,7 +465,7 @@ const DeliverablesStep = ({ data, updateData }: { data: FormData, updateData: (k
     );
 };
 
-const ShotListStep = ({ data, updateData }: { data: FormData, updateData: (key: string, value: any) => void }) => {
+const ShotListStep = ({ data, updateData }: { data: FormData, updateData: (key: keyof FormData, value: any) => void }) => {
     const [isLoading, setIsLoading] = useState(false);
     const shotList = data.shotList || [];
 
@@ -562,7 +561,7 @@ const ShotListStep = ({ data, updateData }: { data: FormData, updateData: (key: 
     );
 };
 
-const CallSheetStep = ({ data, updateData }: { data: FormData, updateData: (key: string, value: any) => void }) => {
+const CallSheetStep = ({ data, updateData }: { data: FormData, updateData: (key: keyof FormData, value: any) => void }) => {
     const [isLoading, setIsLoading] = useState(false);
     const crew = data.crew || [];
 
@@ -654,7 +653,7 @@ const ReviewStep = ({ data, scriptsLoaded }: { data: FormData, scriptsLoaded: bo
         }
         const { jsPDF } = (window as any).jspdf;
         const input = briefContentRef.current;
-        (window as any).html2canvas(input, { scale: 2 }).then((canvas: any) => {
+        (window as any).html2canvas(input, { scale: 2 }).then((canvas: HTMLCanvasElement) => {
             const imgData = canvas.toDataURL('image/png');
             const pdf = new jsPDF('p', 'mm', 'a4');
             const pdfWidth = pdf.internal.pageSize.getWidth();
@@ -720,7 +719,7 @@ const ReviewStep = ({ data, scriptsLoaded }: { data: FormData, scriptsLoaded: bo
                 <h2 className="text-2xl font-bold text-gray-800">Review & Distribute</h2>
                 <p className="text-gray-600">Please review all the details below. Once you&apos;re happy, choose how you&apos;d like to share or save the document.</p>
                 <div id="brief-content-for-pdf" ref={briefContentRef} className="space-y-8 p-6 bg-white rounded-lg border border-gray-200">
-                    {Object.entries(data).map(([key, value]) => {
+                    {Object.entries(data).map(([key, value]: [string, any]) => {
                         if (!value || (Array.isArray(value) && value.length === 0)) return null;
                         
                         let content;
@@ -841,7 +840,7 @@ export default function BriefBuilder() {
             });
     }, []);
 
-    const updateFormData = (key: string, value: any) => {
+    const updateFormData = (key: keyof FormData, value: FormData[keyof FormData]) => {
         setFormData(prev => ({ ...prev, [key]: value }));
     };
 
@@ -906,9 +905,9 @@ export default function BriefBuilder() {
             case 'moodboard': return <MoodboardStep data={formData} updateData={updateFormData} />;
             case 'contact': return <ContactStep data={formData} updateData={updateFormData} />;
             case 'location': return <LocationShootDateStep data={formData} updateData={updateFormData} />;
-            case 'deliverables': return <DeliverablesStep data={formData} updateData={updateFormData} />;
+            case 'deliverables': return <DeliverablesStep data={formData} updateData={updateData} />;
             case 'shotlist': return <ShotListStep data={formData} updateData={updateFormData} />;
-            case 'callsheet': return <CallSheetStep data={formData} updateData={updateFormData} />;
+            case 'callsheet': return <CallSheetStep data={formData} updateData={updateData} />;
             case 'review': return <ReviewStep data={formData} scriptsLoaded={scriptsLoaded} />;
             default: return <div>Loading...</div>;
         }
