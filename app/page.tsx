@@ -1,4 +1,4 @@
-import BriefBuilder from "./brief-builder";
+import BriefBuilder from "@/components/brief-builder";
 
 export default function HomePage() {
   return (
