@@ -49,6 +49,12 @@ interface FormData {
   notes?: string;
 }
 
+interface Step {
+  id: string;
+  title: string;
+  icon: React.ReactNode;
+}
+
 
 // --- SVG ICONS ---
 // Using inline SVGs to keep everything in a single file.
@@ -119,11 +125,14 @@ const SparklesIcon = ({ className }: { className: string }) => (
 
 // --- API HELPER ---
 // This function calls the Gemini API.
-async function callGeminiAPI(prompt: string, jsonSchema: any = null) {
+async function callGeminiAPI(prompt: string, jsonSchema: Record<string, any> | null = null) {
   const apiKey = ""; // This will be handled by the environment.
   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
 
-  const payload: any = {
+  const payload: {
+    contents: { parts: { text: string }[] }[];
+    generationConfig?: { responseMimeType: string; responseSchema: Record<string, any> };
+  } = {
     contents: [{ parts: [{ text: prompt }] }],
   };
 
@@ -180,14 +189,14 @@ const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose:
     );
 };
 
-const Input = ({ label, id, ...props }: { label: string, id: string, [key: string]: any }) => (
+const Input = ({ label, id, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { label: string, id: string }) => (
     <div>
         <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
         <input id={id} className="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" {...props} />
     </div>
 );
 
-const Select = ({ label, id, children, ...props }: { label: string, id: string, children: React.ReactNode, [key: string]: any }) => (
+const Select = ({ label, id, children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement> & { label: string, id: string, children: React.ReactNode }) => (
      <div>
         <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
         <select id={id} className="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" {...props}>
@@ -196,10 +205,10 @@ const Select = ({ label, id, children, ...props }: { label: string, id: string, 
     </div>
 );
 
-const Textarea = ({ label, id, ...props }: { label: string, id: string, [key: string]: any }) => (
+const Textarea = ({ label, id, ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { label: string, id: string }) => (
     <div>
         <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-        <textarea id={id} rows="4" className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" {...props}></textarea>
+        <textarea id={id} rows={4} className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" {...props}></textarea>
     </div>
 );
 
@@ -288,16 +297,16 @@ const ProjectDetailsStep = ({ data, updateData }: { data: FormData, updateData: 
                  : "Define the core project parameters, objectives, and creative direction."}
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Input label="Project Name" id="projectName" placeholder="e.g., Autumn Campaign Shoot" value={data.projectName || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateData('projectName', e.target.value)} />
+                <Input label="Project Name" id="projectName" placeholder="e.g., Autumn Campaign Shoot" value={data.projectName || ''} onChange={(e) => updateData('projectName', e.target.value)} />
                 {data.userRole === 'Client' ? (
-                    <Input label="Budget Range (Optional)" id="budget" placeholder="e.g., $5,000 - $8,000" value={data.budget || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateData('budget', e.target.value)} />
+                    <Input label="Budget Range (Optional)" id="budget" placeholder="e.g., $5,000 - $8,000" value={data.budget || ''} onChange={(e) => updateData('budget', e.target.value)} />
                 ) : (
-                    <Input label="Project Type" id="projectType" placeholder="e.g., Food Photography, Corporate Headshots" value={data.projectType || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateData('projectType', e.target.value)} />
+                    <Input label="Project Type" id="projectType" placeholder="e.g., Food Photography, Corporate Headshots" value={data.projectType || ''} onChange={(e) => updateData('projectType', e.target.value)} />
                 )}
             </div>
-            <Textarea label="Project Overview" id="overview" placeholder="Briefly describe the project..." value={data.overview || ''} onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => updateData('overview', e.target.value)} />
-            <Textarea label="Key Objectives & Messages" id="objectives" placeholder="What should these images achieve or communicate?" value={data.objectives || ''} onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => updateData('objectives', e.target.value)} />
-            <Textarea label="Target Audience" id="audience" placeholder="Describe the ideal customer or viewer." value={data.audience || ''} onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => updateData('audience', e.target.value)} />
+            <Textarea label="Project Overview" id="overview" placeholder="Briefly describe the project..." value={data.overview || ''} onChange={(e) => updateData('overview', e.target.value)} />
+            <Textarea label="Key Objectives & Messages" id="objectives" placeholder="What should these images achieve or communicate?" value={data.objectives || ''} onChange={(e) => updateData('objectives', e.target.value)} />
+            <Textarea label="Target Audience" id="audience" placeholder="Describe the ideal customer or viewer." value={data.audience || ''} onChange={(e) => updateData('audience', e.target.value)} />
         </div>
     );
 };
@@ -307,10 +316,10 @@ const ContactStep = ({ data, updateData }: { data: FormData, updateData: (key: s
         <h2 className="text-2xl font-bold text-gray-800">Your Contact Information</h2>
         <p className="text-gray-600">How can the creative team get in touch with you to discuss this inquiry?</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Input label="Full Name" id="clientName" placeholder="e.g., Jane Doe" value={data.clientName || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateData('clientName', e.target.value)} />
-            <Input label="Company Name (Optional)" id="clientCompany" placeholder="e.g., Acme Inc." value={data.clientCompany || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateData('clientCompany', e.target.value)} />
-            <Input label="Email Address" id="clientEmail" type="email" placeholder="jane.doe@example.com" value={data.clientEmail || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateData('clientEmail', e.target.value)} />
-            <Input label="Phone Number" id="clientPhone" type="tel" placeholder="+1 (555) 123-4567" value={data.clientPhone || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateData('clientPhone', e.target.value)} />
+            <Input label="Full Name" id="clientName" placeholder="e.g., Jane Doe" value={data.clientName || ''} onChange={(e) => updateData('clientName', e.target.value)} />
+            <Input label="Company Name (Optional)" id="clientCompany" placeholder="e.g., Acme Inc." value={data.clientCompany || ''} onChange={(e) => updateData('clientCompany', e.target.value)} />
+            <Input label="Email Address" id="clientEmail" type="email" placeholder="jane.doe@example.com" value={data.clientEmail || ''} onChange={(e) => updateData('clientEmail', e.target.value)} />
+            <Input label="Phone Number" id="clientPhone" type="tel" placeholder="+1 (555) 123-4567" value={data.clientPhone || ''} onChange={(e) => updateData('clientPhone', e.target.value)} />
         </div>
     </div>
 );
@@ -320,10 +329,10 @@ const LocationShootDateStep = ({ data, updateData }: { data: FormData, updateDat
         <h2 className="text-2xl font-bold text-gray-800">Shoot Dates & Location</h2>
         <p className="text-gray-600">Provide the planned dates and location details for the shoot.</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Input label="Proposed Shoot Date(s)" id="shootDates" type="text" placeholder="e.g., Oct 28-29, 2025" value={data.shootDates || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateData('shootDates', e.target.value)} />
-             <Input label="Shoot Status" id="shootStatus" type="text" placeholder="e.g., Confirmed, Pencil" value={data.shootStatus || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateData('shootStatus', e.target.value)} />
+            <Input label="Proposed Shoot Date(s)" id="shootDates" type="text" placeholder="e.g., Oct 28-29, 2025" value={data.shootDates || ''} onChange={(e) => updateData('shootDates', e.target.value)} />
+             <Input label="Shoot Status" id="shootStatus" type="text" placeholder="e.g., Confirmed, Pencil" value={data.shootStatus || ''} onChange={(e) => updateData('shootStatus', e.target.value)} />
         </div>
-        <Textarea label="Location Address & Details" id="location" placeholder="Provide the full address and any important details like parking, access, etc." value={data.location || ''} onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => updateData('location', e.target.value)} />
+        <Textarea label="Location Address & Details" id="location" placeholder="Provide the full address and any important details like parking, access, etc." value={data.location || ''} onChange={(e) => updateData('location', e.target.value)} />
     </div>
 );
 
@@ -345,7 +354,7 @@ const MoodboardStep = ({ data, updateData }: { data: FormData, updateData: (key:
     };
 
     const removeFile = (indexToRemove: number) => {
-        updateData('moodboardFiles', files.filter((_: any, index: number) => index !== indexToRemove));
+        updateData('moodboardFiles', files.filter((_, index) => index !== indexToRemove));
     };
 
     return (
@@ -358,7 +367,7 @@ const MoodboardStep = ({ data, updateData }: { data: FormData, updateData: (key:
                 id="moodboardLink" 
                 placeholder="e.g., https://pinterest.com/your-board" 
                 value={data.moodboardLink || ''} 
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateData('moodboardLink', e.target.value)} 
+                onChange={(e) => updateData('moodboardLink', e.target.value)} 
             />
 
             <div>
@@ -504,7 +513,7 @@ const ShotListStep = ({ data, updateData }: { data: FormData, updateData: (key: 
         updateData('shotList', [...shotList, newShot]);
     };
     const removeShot = (id: number) => updateData('shotList', shotList.filter((shot) => shot.id !== id));
-    const handleShotChange = (id: number, field: keyof Shot, value: any) => {
+    const handleShotChange = (id: number, field: keyof Shot, value: string | boolean) => {
         const newShotList = shotList.map((shot) => shot.id === id ? { ...shot, [field]: value } : shot);
         updateData('shotList', newShotList);
     };
@@ -531,16 +540,16 @@ const ShotListStep = ({ data, updateData }: { data: FormData, updateData: (key: 
                              <h3 className="font-semibold text-gray-800">Shot #{index + 1}</h3>
                              <button onClick={() => removeShot(shot.id)} className="text-gray-400 hover:text-red-500"><TrashIcon className="h-5 w-5"/></button>
                         </div>
-                        <Textarea id={`shot-desc-${shot.id}`} label="Description" placeholder="e.g., Hero shot of the final dish on a rustic wooden table." value={shot.description} onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleShotChange(shot.id, 'description', e.target.value)} />
+                        <Textarea id={`shot-desc-${shot.id}`} label="Description" placeholder="e.g., Hero shot of the final dish on a rustic wooden table." value={shot.description} onChange={(e) => handleShotChange(shot.id, 'description', e.target.value)} />
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                           <Select id={`shot-type-${shot.id}`} label="Shot Type" value={shot.shotType} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleShotChange(shot.id, 'shotType', e.target.value)}>
+                           <Select id={`shot-type-${shot.id}`} label="Shot Type" value={shot.shotType} onChange={(e) => handleShotChange(shot.id, 'shotType', e.target.value)}>
                                 <option>Wide</option><option>Medium</option><option>Close-up</option><option>Detail</option><option>Overhead</option>
                            </Select>
-                           <Select id={`shot-angle-${shot.id}`} label="Angle" value={shot.angle} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleShotChange(shot.id, 'angle', e.target.value)}>
+                           <Select id={`shot-angle-${shot.id}`} label="Angle" value={shot.angle} onChange={(e) => handleShotChange(shot.id, 'angle', e.target.value)}>
                                 <option>Eye-level</option><option>High Angle</option><option>Low Angle</option><option>Dutch Angle</option>
                            </Select>
                         </div>
-                        <Input id={`shot-notes-${shot.id}`} label="Notes (Props, Lighting, etc.)" placeholder="e.g., Use natural side light, include fresh herbs as props." value={shot.notes} onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleShotChange(shot.id, 'notes', e.target.value)} />
+                        <Input id={`shot-notes-${shot.id}`} label="Notes (Props, Lighting, etc.)" placeholder="e.g., Use natural side light, include fresh herbs as props." value={shot.notes} onChange={(e) => handleShotChange(shot.id, 'notes', e.target.value)} />
                         <div className="flex items-center">
                             <input id={`shot-priority-${shot.id}`} type="checkbox" className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked={shot.priority} onChange={(e) => handleShotChange(shot.id, 'priority', e.target.checked)} />
                             <label htmlFor={`shot-priority-${shot.id}`} className="ml-2 block text-sm text-gray-900">Mark as &quot;must-have&quot; shot</label>
@@ -604,10 +613,10 @@ const CallSheetStep = ({ data, updateData }: { data: FormData, updateData: (key:
                             {isLoading ? 'Generating...' : '✨ Draft Schedule'}
                         </button>
                     </div>
-                    <Textarea label="Schedule / Itinerary" id="schedule" placeholder="e.g., 8:00 AM: Crew Call, 9:00 AM: First Shot..." value={data.schedule || ''} onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => updateData('schedule', e.target.value)} />
+                    <Textarea label="Schedule / Itinerary" id="schedule" placeholder="e.g., 8:00 AM: Crew Call, 9:00 AM: First Shot..." value={data.schedule || ''} onChange={(e) => updateData('schedule', e.target.value)} />
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Input label="Emergency Contact (Name & Number)" id="emergencyContact" placeholder="e.g., Site Manager, 555-1234" value={data.emergencyContact || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateData('emergencyContact', e.target.value)} />
-                        <Input label="Nearest Hospital" id="nearestHospital" placeholder="Name & Address" value={data.nearestHospital || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateData('nearestHospital', e.target.value)} />
+                        <Input label="Emergency Contact (Name & Number)" id="emergencyContact" placeholder="e.g., Site Manager, 555-1234" value={data.emergencyContact || ''} onChange={(e) => updateData('emergencyContact', e.target.value)} />
+                        <Input label="Nearest Hospital" id="nearestHospital" placeholder="Name & Address" value={data.nearestHospital || ''} onChange={(e) => updateData('nearestHospital', e.target.value)} />
                     </div>
                 </div>
             )}
@@ -615,16 +624,16 @@ const CallSheetStep = ({ data, updateData }: { data: FormData, updateData: (key:
             <div className="space-y-4">
                 {crew.map((member, index) => (
                     <div key={member.id} className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 border rounded-lg bg-white relative">
-                         <div className="md:col-span-2"><Input label={`Name #${index + 1}`} id={`name-${member.id}`} placeholder="e.g., Jane Doe" value={member.name} onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleCrewChange(member.id, 'name', e.target.value)} /></div>
-                         <div><Input label="Role" id={`role-${member.id}`} placeholder="e.g., Stylist" value={member.role} onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleCrewChange(member.id, 'role', e.target.value)} /></div>
-                         <div><Input label="Call Time" id={`callTime-${member.id}`} type="time" value={member.callTime} onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleCrewChange(member.id, 'callTime', e.target.value)} /></div>
-                         <div className="flex items-end"><Input label="Contact" id={`contact-${member.id}`} placeholder="Phone or Email" value={member.contact} onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleCrewChange(member.id, 'contact', e.target.value)} /></div>
+                         <div className="md:col-span-2"><Input label={`Name #${index + 1}`} id={`name-${member.id}`} placeholder="e.g., Jane Doe" value={member.name} onChange={(e) => handleCrewChange(member.id, 'name', e.target.value)} /></div>
+                         <div><Input label="Role" id={`role-${member.id}`} placeholder="e.g., Stylist" value={member.role} onChange={(e) => handleCrewChange(member.id, 'role', e.target.value)} /></div>
+                         <div><Input label="Call Time" id={`callTime-${member.id}`} type="time" value={member.callTime} onChange={(e) => handleCrewChange(member.id, 'callTime', e.target.value)} /></div>
+                         <div className="flex items-end"><Input label="Contact" id={`contact-${member.id}`} placeholder="Phone or Email" value={member.contact} onChange={(e) => handleCrewChange(member.id, 'contact', e.target.value)} /></div>
                          <button onClick={() => removeCrewMember(member.id)} className="absolute top-2 right-2 text-gray-400 hover:text-red-500"><TrashIcon className="h-5 w-5"/></button>
                     </div>
                 ))}
             </div>
             <button onClick={addCrewMember} className="w-full flex justify-center items-center px-4 py-2 border border-dashed border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">+ Add Crew / Talent</button>
-            <Textarea label="Special Notes" id="notes" placeholder="e.g., allergies, parking info, special instructions..." value={data.notes || ''} onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => updateData('notes', e.target.value)} />
+            <Textarea label="Special Notes" id="notes" placeholder="e.g., allergies, parking info, special instructions..." value={data.notes || ''} onChange={(e) => updateData('notes', e.target.value)} />
         </div>
     );
 };
@@ -784,7 +793,7 @@ const ReviewStep = ({ data, scriptsLoaded }: { data: FormData, scriptsLoaded: bo
                         id="emailRecipients"
                         placeholder="john@example.com, jane@example.com"
                         value={emailRecipients}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmailRecipients(e.target.value)}
+                        onChange={(e) => setEmailRecipients(e.target.value)}
                     />
                     <button onClick={handleSendEmail} disabled={isSending} className="w-full px-4 py-2 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 disabled:bg-indigo-300">
                         {isSending ? 'Sending...' : 'Send'}
@@ -802,7 +811,7 @@ export default function BriefBuilder() {
     const [step, setStep] = useState(1);
     const [formData, setFormData] = useState<FormData>({});
     const [wizardStarted, setWizardStarted] = useState(false);
-    const [steps, setSteps] = useState<any[]>([]);
+    const [steps, setSteps] = useState<Step[]>([]);
     const [scriptsLoaded, setScriptsLoaded] = useState(false);
 
     useEffect(() => {
@@ -845,14 +854,14 @@ export default function BriefBuilder() {
         const role = formData.userRole;
         if (!role) return;
 
-        const baseSteps = [
+        const baseSteps: Step[] = [
             { id: 'details', title: 'Project Details', icon: <BriefcaseIcon /> },
             { id: 'moodboard', title: 'Mood Board', icon: <ImageIcon /> },
             { id: 'deliverables', title: 'Deliverables', icon: <CameraIcon /> },
             { id: 'shotlist', title: 'Shot List', icon: <ListIcon /> },
         ];
 
-        const reviewStep = { id: 'review', title: 'Review & Distribute', icon: <CheckCircleIcon /> };
+        const reviewStep: Step = { id: 'review', title: 'Review & Distribute', icon: <CheckCircleIcon /> };
 
         if (role === 'Client') {
             setSteps([
