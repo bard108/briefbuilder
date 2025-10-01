@@ -40,7 +40,7 @@ const CheckCircleIcon = () => (
         <polyline points="22 4 12 14.01 9 11.01"></polyline>
     </svg>
 );
-const TrashIcon = ({ className }) => (
+const TrashIcon = ({ className }: { className: string }) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
         <path d="M3 6h18"></path>
         <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -63,7 +63,7 @@ const ImageIcon = () => (
         <polyline points="21 15 16 10 5 21"></polyline>
     </svg>
 );
-const SparklesIcon = ({ className }) => (
+const SparklesIcon = ({ className }: { className: string }) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
         <path d="m12 3-1.9 4.2-4.2 1.9 4.2 1.9L12 15l1.9-4.2 4.2-1.9-4.2-1.9L12 3zM3 12l1.9 4.2 4.2 1.9-4.2 1.9L3 24l-1.9-4.2-4.2-1.9 4.2-1.9L3 12zM21 12l-1.9 4.2-4.2 1.9 4.2 1.9L21 24l1.9-4.2 4.2-1.9-4.2-1.9L21 12z"></path>
     </svg>
@@ -71,11 +71,11 @@ const SparklesIcon = ({ className }) => (
 
 // --- API HELPER ---
 // This function calls the Gemini API.
-async function callGeminiAPI(prompt, jsonSchema = null) {
+async function callGeminiAPI(prompt: string, jsonSchema: any = null) {
   const apiKey = ""; // This will be handled by the environment.
   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
 
-  const payload = {
+  const payload: any = {
     contents: [{ parts: [{ text: prompt }] }],
   };
 
@@ -116,7 +116,7 @@ async function callGeminiAPI(prompt, jsonSchema = null) {
 
 
 // --- FORM HELPER COMPONENTS ---
-const Modal = ({ isOpen, onClose, title, children }) => {
+const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose: () => void, title: string, children: React.ReactNode }) => {
     if (!isOpen) return null;
 
     return (
@@ -132,14 +132,14 @@ const Modal = ({ isOpen, onClose, title, children }) => {
     );
 };
 
-const Input = ({ label, id, ...props }) => (
+const Input = ({ label, id, ...props }: { label: string, id: string, [key: string]: any }) => (
     <div>
         <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
         <input id={id} className="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" {...props} />
     </div>
 );
 
-const Select = ({ label, id, children, ...props }) => (
+const Select = ({ label, id, children, ...props }: { label: string, id: string, children: React.ReactNode, [key: string]: any }) => (
      <div>
         <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
         <select id={id} className="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" {...props}>
@@ -148,14 +148,14 @@ const Select = ({ label, id, children, ...props }) => (
     </div>
 );
 
-const Textarea = ({ label, id, ...props }) => (
+const Textarea = ({ label, id, ...props }: { label: string, id: string, [key: string]: any }) => (
     <div>
         <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
         <textarea id={id} rows="4" className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" {...props}></textarea>
     </div>
 );
 
-const CheckboxGroup = ({ legend, options, selectedOptions, onChange }) => (
+const CheckboxGroup = ({ legend, options, selectedOptions, onChange }: { legend: string, options: {id: string, label: string}[], selectedOptions: string[], onChange: (id: string) => void }) => (
     <fieldset>
         <legend className="block text-sm font-medium text-gray-700 mb-2">{legend}</legend>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -183,7 +183,7 @@ const CheckboxGroup = ({ legend, options, selectedOptions, onChange }) => (
 
 // --- WIZARD STEP COMPONENTS ---
 
-const StartPage = ({ onSelectRole }) => (
+const StartPage = ({ onSelectRole }: { onSelectRole: (role: string) => void }) => (
     <div className="bg-gray-100 min-h-screen font-sans p-4 sm:p-6 lg:p-8 flex items-center justify-center">
         <div className="max-w-md w-full text-center bg-white p-10 rounded-xl shadow-lg animate-fade-in">
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Create a New Brief</h1>
@@ -203,7 +203,7 @@ const StartPage = ({ onSelectRole }) => (
     </div>
 );
 
-const ProjectDetailsStep = ({ data, updateData }) => {
+const ProjectDetailsStep = ({ data, updateData }: { data: any, updateData: (key: string, value: any) => void }) => {
     const [isLoading, setIsLoading] = useState(false);
 
     const generateIdeas = async () => {
@@ -240,49 +240,49 @@ const ProjectDetailsStep = ({ data, updateData }) => {
                  : "Define the core project parameters, objectives, and creative direction."}
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Input label="Project Name" id="projectName" placeholder="e.g., Autumn Campaign Shoot" value={data.projectName || ''} onChange={(e) => updateData('projectName', e.target.value)} />
+                <Input label="Project Name" id="projectName" placeholder="e.g., Autumn Campaign Shoot" value={data.projectName || ''} onChange={(e: any) => updateData('projectName', e.target.value)} />
                 {data.userRole === 'Client' ? (
-                    <Input label="Budget Range (Optional)" id="budget" placeholder="e.g., $5,000 - $8,000" value={data.budget || ''} onChange={(e) => updateData('budget', e.target.value)} />
+                    <Input label="Budget Range (Optional)" id="budget" placeholder="e.g., $5,000 - $8,000" value={data.budget || ''} onChange={(e: any) => updateData('budget', e.target.value)} />
                 ) : (
-                    <Input label="Project Type" id="projectType" placeholder="e.g., Food Photography, Corporate Headshots" value={data.projectType || ''} onChange={(e) => updateData('projectType', e.target.value)} />
+                    <Input label="Project Type" id="projectType" placeholder="e.g., Food Photography, Corporate Headshots" value={data.projectType || ''} onChange={(e: any) => updateData('projectType', e.target.value)} />
                 )}
             </div>
-            <Textarea label="Project Overview" id="overview" placeholder="Briefly describe the project..." value={data.overview || ''} onChange={(e) => updateData('overview', e.target.value)} />
-            <Textarea label="Key Objectives & Messages" id="objectives" placeholder="What should these images achieve or communicate?" value={data.objectives || ''} onChange={(e) => updateData('objectives', e.target.value)} />
-            <Textarea label="Target Audience" id="audience" placeholder="Describe the ideal customer or viewer." value={data.audience || ''} onChange={(e) => updateData('audience', e.target.value)} />
+            <Textarea label="Project Overview" id="overview" placeholder="Briefly describe the project..." value={data.overview || ''} onChange={(e: any) => updateData('overview', e.target.value)} />
+            <Textarea label="Key Objectives & Messages" id="objectives" placeholder="What should these images achieve or communicate?" value={data.objectives || ''} onChange={(e: any) => updateData('objectives', e.target.value)} />
+            <Textarea label="Target Audience" id="audience" placeholder="Describe the ideal customer or viewer." value={data.audience || ''} onChange={(e: any) => updateData('audience', e.target.value)} />
         </div>
     );
 };
 
-const ContactStep = ({ data, updateData }) => (
+const ContactStep = ({ data, updateData }: { data: any, updateData: (key: string, value: any) => void }) => (
     <div className="space-y-6">
         <h2 className="text-2xl font-bold text-gray-800">Your Contact Information</h2>
         <p className="text-gray-600">How can the creative team get in touch with you to discuss this inquiry?</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Input label="Full Name" id="clientName" placeholder="e.g., Jane Doe" value={data.clientName || ''} onChange={(e) => updateData('clientName', e.target.value)} />
-            <Input label="Company Name (Optional)" id="clientCompany" placeholder="e.g., Acme Inc." value={data.clientCompany || ''} onChange={(e) => updateData('clientCompany', e.target.value)} />
-            <Input label="Email Address" id="clientEmail" type="email" placeholder="jane.doe@example.com" value={data.clientEmail || ''} onChange={(e) => updateData('clientEmail', e.target.value)} />
-            <Input label="Phone Number" id="clientPhone" type="tel" placeholder="+1 (555) 123-4567" value={data.clientPhone || ''} onChange={(e) => updateData('clientPhone', e.target.value)} />
+            <Input label="Full Name" id="clientName" placeholder="e.g., Jane Doe" value={data.clientName || ''} onChange={(e: any) => updateData('clientName', e.target.value)} />
+            <Input label="Company Name (Optional)" id="clientCompany" placeholder="e.g., Acme Inc." value={data.clientCompany || ''} onChange={(e: any) => updateData('clientCompany', e.target.value)} />
+            <Input label="Email Address" id="clientEmail" type="email" placeholder="jane.doe@example.com" value={data.clientEmail || ''} onChange={(e: any) => updateData('clientEmail', e.target.value)} />
+            <Input label="Phone Number" id="clientPhone" type="tel" placeholder="+1 (555) 123-4567" value={data.clientPhone || ''} onChange={(e: any) => updateData('clientPhone', e.target.value)} />
         </div>
     </div>
 );
 
-const LocationShootDateStep = ({ data, updateData }) => (
+const LocationShootDateStep = ({ data, updateData }: { data: any, updateData: (key: string, value: any) => void }) => (
      <div className="space-y-6">
         <h2 className="text-2xl font-bold text-gray-800">Shoot Dates & Location</h2>
         <p className="text-gray-600">Provide the planned dates and location details for the shoot.</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Input label="Proposed Shoot Date(s)" id="shootDates" type="text" placeholder="e.g., Oct 28-29, 2025" value={data.shootDates || ''} onChange={(e) => updateData('shootDates', e.target.value)} />
-             <Input label="Shoot Status" id="shootStatus" type="text" placeholder="e.g., Confirmed, Pencil" value={data.shootStatus || ''} onChange={(e) => updateData('shootStatus', e.target.value)} />
+            <Input label="Proposed Shoot Date(s)" id="shootDates" type="text" placeholder="e.g., Oct 28-29, 2025" value={data.shootDates || ''} onChange={(e: any) => updateData('shootDates', e.target.value)} />
+             <Input label="Shoot Status" id="shootStatus" type="text" placeholder="e.g., Confirmed, Pencil" value={data.shootStatus || ''} onChange={(e: any) => updateData('shootStatus', e.target.value)} />
         </div>
-        <Textarea label="Location Address & Details" id="location" placeholder="Provide the full address and any important details like parking, access, etc." value={data.location || ''} onChange={(e) => updateData('location', e.target.value)} />
+        <Textarea label="Location Address & Details" id="location" placeholder="Provide the full address and any important details like parking, access, etc." value={data.location || ''} onChange={(e: any) => updateData('location', e.target.value)} />
     </div>
 );
 
-const MoodboardStep = ({ data, updateData }) => {
+const MoodboardStep = ({ data, updateData }: { data: any, updateData: (key: string, value: any) => void }) => {
     const files = useMemo(() => data.moodboardFiles || [], [data.moodboardFiles]);
 
-    const previews = useMemo(() => files.map(file => URL.createObjectURL(file)), [files]);
+    const previews = useMemo(() => files.map((file: File) => URL.createObjectURL(file)), [files]);
 
     useEffect(() => {
         // This effect runs when the component unmounts, cleaning up the URLs.
@@ -291,13 +291,13 @@ const MoodboardStep = ({ data, updateData }) => {
         };
     }, [previews]);
 
-    const handleFileChange = (event) => {
-        const selectedFiles = Array.from(event.target.files);
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const selectedFiles = Array.from(event.target.files || []);
         updateData('moodboardFiles', [...files, ...selectedFiles]);
     };
 
-    const removeFile = (indexToRemove) => {
-        updateData('moodboardFiles', files.filter((_, index) => index !== indexToRemove));
+    const removeFile = (indexToRemove: number) => {
+        updateData('moodboardFiles', files.filter((_: any, index: number) => index !== indexToRemove));
     };
 
     return (
@@ -310,7 +310,7 @@ const MoodboardStep = ({ data, updateData }) => {
                 id="moodboardLink" 
                 placeholder="e.g., https://pinterest.com/your-board" 
                 value={data.moodboardLink || ''} 
-                onChange={(e) => updateData('moodboardLink', e.target.value)} 
+                onChange={(e: any) => updateData('moodboardLink', e.target.value)} 
             />
 
             <div>
@@ -355,7 +355,7 @@ const MoodboardStep = ({ data, updateData }) => {
 };
 
 
-const DeliverablesStep = ({ data, updateData }) => {
+const DeliverablesStep = ({ data, updateData }: { data: any, updateData: (key: string, value: any) => void }) => {
     const deliverableOptions = [
         { id: 'photography', label: 'Photography' }, { id: 'video', label: 'Video' },
         { id: 'socialAssets', label: 'Social Assets' }, { id: 'other', label: 'Other' },
@@ -374,9 +374,9 @@ const DeliverablesStep = ({ data, updateData }) => {
         { id: 'twitterPost', label: 'X / Twitter Post' }, { id: 'otherSocial', label: 'Other' },
     ];
 
-    const handleCheckboxChange = (group, id) => {
+    const handleCheckboxChange = (group: string, id: string) => {
         const currentSelection = data[group] || [];
-        const newSelection = currentSelection.includes(id) ? currentSelection.filter(item => item !== id) : [...currentSelection, id];
+        const newSelection = currentSelection.includes(id) ? currentSelection.filter((item: string) => item !== id) : [...currentSelection, id];
         updateData(group, newSelection);
     };
 
@@ -409,7 +409,7 @@ const DeliverablesStep = ({ data, updateData }) => {
     );
 };
 
-const ShotListStep = ({ data, updateData }) => {
+const ShotListStep = ({ data, updateData }: { data: any, updateData: (key: string, value: any) => void }) => {
     const [isLoading, setIsLoading] = useState(false);
     const shotList = data.shotList || [];
 
@@ -441,7 +441,7 @@ const ShotListStep = ({ data, updateData }) => {
         
         if (result) {
             try {
-                const newShots = JSON.parse(result).map(shot => ({ ...shot, id: Date.now() + Math.random() }));
+                const newShots = JSON.parse(result).map((shot: any) => ({ ...shot, id: Date.now() + Math.random() }));
                 updateData('shotList', [...shotList, ...newShots]);
             } catch (e) {
                 console.error("Failed to parse shot list JSON:", e);
@@ -455,9 +455,9 @@ const ShotListStep = ({ data, updateData }) => {
         const newShot = { id: Date.now(), description: '', shotType: 'Medium', angle: 'Eye-level', priority: false, notes: '' };
         updateData('shotList', [...shotList, newShot]);
     };
-    const removeShot = (id) => updateData('shotList', shotList.filter(shot => shot.id !== id));
-    const handleShotChange = (id, field, value) => {
-        const newShotList = shotList.map(shot => shot.id === id ? { ...shot, [field]: value } : shot);
+    const removeShot = (id: number) => updateData('shotList', shotList.filter((shot: any) => shot.id !== id));
+    const handleShotChange = (id: number, field: string, value: any) => {
+        const newShotList = shotList.map((shot: any) => shot.id === id ? { ...shot, [field]: value } : shot);
         updateData('shotList', newShotList);
     };
 
@@ -477,22 +477,22 @@ const ShotListStep = ({ data, updateData }) => {
             </p>
             
             <div className="space-y-4">
-                {shotList.map((shot, index) => (
+                {shotList.map((shot: any, index: number) => (
                     <div key={shot.id} className="p-4 border rounded-lg bg-white relative space-y-4">
                         <div className="flex justify-between items-start">
                              <h3 className="font-semibold text-gray-800">Shot #{index + 1}</h3>
                              <button onClick={() => removeShot(shot.id)} className="text-gray-400 hover:text-red-500"><TrashIcon className="h-5 w-5"/></button>
                         </div>
-                        <Textarea id={`shot-desc-${shot.id}`} label="Description" placeholder="e.g., Hero shot of the final dish on a rustic wooden table." value={shot.description} onChange={(e) => handleShotChange(shot.id, 'description', e.target.value)} />
+                        <Textarea id={`shot-desc-${shot.id}`} label="Description" placeholder="e.g., Hero shot of the final dish on a rustic wooden table." value={shot.description} onChange={(e: any) => handleShotChange(shot.id, 'description', e.target.value)} />
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                           <Select id={`shot-type-${shot.id}`} label="Shot Type" value={shot.shotType} onChange={(e) => handleShotChange(shot.id, 'shotType', e.target.value)}>
+                           <Select id={`shot-type-${shot.id}`} label="Shot Type" value={shot.shotType} onChange={(e: any) => handleShotChange(shot.id, 'shotType', e.target.value)}>
                                 <option>Wide</option><option>Medium</option><option>Close-up</option><option>Detail</option><option>Overhead</option>
                            </Select>
-                           <Select id={`shot-angle-${shot.id}`} label="Angle" value={shot.angle} onChange={(e) => handleShotChange(shot.id, 'angle', e.target.value)}>
+                           <Select id={`shot-angle-${shot.id}`} label="Angle" value={shot.angle} onChange={(e: any) => handleShotChange(shot.id, 'angle', e.target.value)}>
                                 <option>Eye-level</option><option>High Angle</option><option>Low Angle</option><option>Dutch Angle</option>
                            </Select>
                         </div>
-                        <Input id={`shot-notes-${shot.id}`} label="Notes (Props, Lighting, etc.)" placeholder="e.g., Use natural side light, include fresh herbs as props." value={shot.notes} onChange={(e) => handleShotChange(shot.id, 'notes', e.target.value)} />
+                        <Input id={`shot-notes-${shot.id}`} label="Notes (Props, Lighting, etc.)" placeholder="e.g., Use natural side light, include fresh herbs as props." value={shot.notes} onChange={(e: any) => handleShotChange(shot.id, 'notes', e.target.value)} />
                         <div className="flex items-center">
                             <input id={`shot-priority-${shot.id}`} type="checkbox" className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked={shot.priority} onChange={(e) => handleShotChange(shot.id, 'priority', e.target.checked)} />
                             <label htmlFor={`shot-priority-${shot.id}`} className="ml-2 block text-sm text-gray-900">Mark as &quot;must-have&quot; shot</label>
@@ -505,14 +505,14 @@ const ShotListStep = ({ data, updateData }) => {
     );
 };
 
-const CallSheetStep = ({ data, updateData }) => {
+const CallSheetStep = ({ data, updateData }: { data: any, updateData: (key: string, value: any) => void }) => {
     const [isLoading, setIsLoading] = useState(false);
     const crew = data.crew || [];
 
     const generateSchedule = async () => {
         setIsLoading(true);
-        const shotListSummary = (data.shotList || []).map(s => `- ${s.description} (${s.shotType})`).join('\n');
-        const crewListSummary = (data.crew || []).map(c => `- ${c.name} (${c.role})`).join('\n');
+        const shotListSummary = (data.shotList || []).map((s: any) => `- ${s.description} (${s.shotType})`).join('\n');
+        const crewListSummary = (data.crew || []).map((c: any) => `- ${c.name} (${c.role})`).join('\n');
         
         const prompt = `You are an expert photo producer. Create a simple, one-paragraph shoot day schedule based on the following information. Be logical and concise.
         Shoot Date: ${data.shootDates || 'TBD'}
@@ -534,9 +534,9 @@ const CallSheetStep = ({ data, updateData }) => {
         const newCrew = [...crew, { id: Date.now(), name: '', role: '', callTime: '', contact: '' }];
         updateData('crew', newCrew);
     };
-    const removeCrewMember = (id) => updateData('crew', crew.filter(member => member.id !== id));
-    const handleCrewChange = (id, field, value) => {
-        const newCrew = crew.map(member => member.id === id ? { ...member, [field]: value } : member);
+    const removeCrewMember = (id: number) => updateData('crew', crew.filter((member: any) => member.id !== id));
+    const handleCrewChange = (id: number, field: string, value: any) => {
+        const newCrew = crew.map((member: any) => member.id === id ? { ...member, [field]: value } : member);
         updateData('crew', newCrew);
     };
     
@@ -556,32 +556,32 @@ const CallSheetStep = ({ data, updateData }) => {
                             {isLoading ? 'Generating...' : '✨ Draft Schedule'}
                         </button>
                     </div>
-                    <Textarea label="Schedule / Itinerary" id="schedule" placeholder="e.g., 8:00 AM: Crew Call, 9:00 AM: First Shot..." value={data.schedule || ''} onChange={(e) => updateData('schedule', e.target.value)} />
+                    <Textarea label="Schedule / Itinerary" id="schedule" placeholder="e.g., 8:00 AM: Crew Call, 9:00 AM: First Shot..." value={data.schedule || ''} onChange={(e: any) => updateData('schedule', e.target.value)} />
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Input label="Emergency Contact (Name & Number)" id="emergencyContact" placeholder="e.g., Site Manager, 555-1234" value={data.emergencyContact || ''} onChange={(e) => updateData('emergencyContact', e.target.value)} />
-                        <Input label="Nearest Hospital" id="nearestHospital" placeholder="Name & Address" value={data.nearestHospital || ''} onChange={(e) => updateData('nearestHospital', e.target.value)} />
+                        <Input label="Emergency Contact (Name & Number)" id="emergencyContact" placeholder="e.g., Site Manager, 555-1234" value={data.emergencyContact || ''} onChange={(e: any) => updateData('emergencyContact', e.target.value)} />
+                        <Input label="Nearest Hospital" id="nearestHospital" placeholder="Name & Address" value={data.nearestHospital || ''} onChange={(e: any) => updateData('nearestHospital', e.target.value)} />
                     </div>
                 </div>
             )}
 
             <div className="space-y-4">
-                {crew.map((member, index) => (
+                {crew.map((member: any, index: number) => (
                     <div key={member.id} className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 border rounded-lg bg-white relative">
-                         <div className="md:col-span-2"><Input label={`Name #${index + 1}`} id={`name-${member.id}`} placeholder="e.g., Jane Doe" value={member.name} onChange={(e) => handleCrewChange(member.id, 'name', e.target.value)} /></div>
-                         <div><Input label="Role" id={`role-${member.id}`} placeholder="e.g., Stylist" value={member.role} onChange={(e) => handleCrewChange(member.id, 'role', e.target.value)} /></div>
-                         <div><Input label="Call Time" id={`callTime-${member.id}`} type="time" value={member.callTime} onChange={(e) => handleCrewChange(member.id, 'callTime', e.target.value)} /></div>
-                         <div className="flex items-end"><Input label="Contact" id={`contact-${member.id}`} placeholder="Phone or Email" value={member.contact} onChange={(e) => handleCrewChange(member.id, 'contact', e.target.value)} /></div>
+                         <div className="md:col-span-2"><Input label={`Name #${index + 1}`} id={`name-${member.id}`} placeholder="e.g., Jane Doe" value={member.name} onChange={(e: any) => handleCrewChange(member.id, 'name', e.target.value)} /></div>
+                         <div><Input label="Role" id={`role-${member.id}`} placeholder="e.g., Stylist" value={member.role} onChange={(e: any) => handleCrewChange(member.id, 'role', e.target.value)} /></div>
+                         <div><Input label="Call Time" id={`callTime-${member.id}`} type="time" value={member.callTime} onChange={(e: any) => handleCrewChange(member.id, 'callTime', e.target.value)} /></div>
+                         <div className="flex items-end"><Input label="Contact" id={`contact-${member.id}`} placeholder="Phone or Email" value={member.contact} onChange={(e: any) => handleCrewChange(member.id, 'contact', e.target.value)} /></div>
                          <button onClick={() => removeCrewMember(member.id)} className="absolute top-2 right-2 text-gray-400 hover:text-red-500"><TrashIcon className="h-5 w-5"/></button>
                     </div>
                 ))}
             </div>
             <button onClick={addCrewMember} className="w-full flex justify-center items-center px-4 py-2 border border-dashed border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">+ Add Crew / Talent</button>
-            <Textarea label="Special Notes" id="notes" placeholder="e.g., allergies, parking info, special instructions..." value={data.notes || ''} onChange={(e) => updateData('notes', e.target.value)} />
+            <Textarea label="Special Notes" id="notes" placeholder="e.g., allergies, parking info, special instructions..." value={data.notes || ''} onChange={(e: any) => updateData('notes', e.target.value)} />
         </div>
     );
 };
 
-const ReviewStep = ({ data, scriptsLoaded }) => {
+const ReviewStep = ({ data, scriptsLoaded }: { data: any, scriptsLoaded: boolean }) => {
     const [isEmailModalOpen, setEmailModalOpen] = useState(false);
     const [isShareModalOpen, setShareModalOpen] = useState(false);
     const [shareLink, setShareLink] = useState('');
@@ -591,13 +591,13 @@ const ReviewStep = ({ data, scriptsLoaded }) => {
     const shareLinkRef = useRef(null);
 
     const handleDownloadPdf = () => {
-        if (!scriptsLoaded || !window.jspdf || !window.html2canvas) {
+        if (!scriptsLoaded || !(window as any).jspdf || !(window as any).html2canvas) {
             alert("PDF generation library is still loading. Please wait a moment and try again.");
             return;
         }
-        const { jsPDF } = window.jspdf;
+        const { jsPDF } = (window as any).jspdf;
         const input = briefContentRef.current;
-        window.html2canvas(input, { scale: 2 }).then((canvas) => {
+        (window as any).html2canvas(input, { scale: 2 }).then((canvas: any) => {
             const imgData = canvas.toDataURL('image/png');
             const pdf = new jsPDF('p', 'mm', 'a4');
             const pdfWidth = pdf.internal.pageSize.getWidth();
@@ -631,7 +631,7 @@ const ReviewStep = ({ data, scriptsLoaded }) => {
     };
 
     const copyToClipboard = () => {
-        const linkInput = shareLinkRef.current;
+        const linkInput = shareLinkRef.current  as HTMLInputElement | null;
         if (linkInput) {
             linkInput.select();
             // Use execCommand for broader compatibility within iFrames
@@ -670,7 +670,7 @@ const ReviewStep = ({ data, scriptsLoaded }) => {
                         if (key === 'crew' && Array.isArray(value)) {
                             content = (
                                 <div className="mt-2 space-y-3">
-                                    {value.map(member => (
+                                    {value.map((member: any) => (
                                         <div key={member.id} className="p-3 bg-gray-50 border border-gray-200 rounded-md">
                                             <p className="font-semibold text-gray-800">{member.name || 'No Name'} - <span className="font-normal text-gray-600">{member.role || 'No Role'}</span></p>
                                             <p className="text-sm text-gray-600">Call: {member.callTime || 'TBD'} | Contact: {member.contact || 'N/A'}</p>
@@ -681,7 +681,7 @@ const ReviewStep = ({ data, scriptsLoaded }) => {
                         } else if (key === 'shotList' && Array.isArray(value)) {
                             content = (
                                 <div className="mt-2 space-y-3">
-                                    {value.map((shot, index) => (
+                                    {value.map((shot: any, index: number) => (
                                         <div key={shot.id} className="p-3 bg-gray-50 border border-gray-200 rounded-md">
                                             <p className="font-semibold text-gray-800">Shot #{index + 1}: {shot.priority && <span className="ml-2 text-xs font-bold text-indigo-600 bg-indigo-100 px-2 py-1 rounded-full">MUST-HAVE</span>}</p>
                                             <p className="mt-1 text-sm text-gray-700">{shot.description || 'No description.'}</p>
@@ -692,11 +692,11 @@ const ReviewStep = ({ data, scriptsLoaded }) => {
                                 </div>
                             );
                         } else if (key === 'moodboardFiles' && Array.isArray(value)) {
-                            content = <span className="text-gray-800">{value.map(f => f.name).join(', ')}</span>
+                            content = <span className="text-gray-800">{value.map((f: File) => f.name).join(', ')}</span>
                         } else if (typeof value === 'object' && value !== null) {
                             content = <span className="text-gray-800">{Object.values(value).join(', ')}</span>;
                         } else {
-                            content = <span className="text-gray-800" style={{whiteSpace: 'pre-wrap'}}>{value}</span>;
+                            content = <span className="text-gray-800" style={{whiteSpace: 'pre-wrap'}}>{String(value)}</span>;
                         }
                         
                         return (
@@ -736,7 +736,7 @@ const ReviewStep = ({ data, scriptsLoaded }) => {
                         id="emailRecipients"
                         placeholder="john@example.com, jane@example.com"
                         value={emailRecipients}
-                        onChange={(e) => setEmailRecipients(e.target.value)}
+                        onChange={(e: any) => setEmailRecipients(e.target.value)}
                     />
                     <button onClick={handleSendEmail} disabled={isSending} className="w-full px-4 py-2 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 disabled:bg-indigo-300">
                         {isSending ? 'Sending...' : 'Send'}
@@ -754,22 +754,22 @@ export default function BriefBuilder() {
     const [step, setStep] = useState(1);
     const [formData, setFormData] = useState({});
     const [wizardStarted, setWizardStarted] = useState(false);
-    const [steps, setSteps] = useState([]);
+    const [steps, setSteps] = useState<any[]>([]);
     const [scriptsLoaded, setScriptsLoaded] = useState(false);
 
     useEffect(() => {
         const jspdfSrc = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
         const html2canvasSrc = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
 
-        const loadScript = (src) => {
-            return new Promise((resolve, reject) => {
+        const loadScript = (src: string) => {
+            return new Promise<void>((resolve, reject) => {
                 if (document.querySelector(`script[src="${src}"]`)) {
                     resolve();
                     return;
                 }
                 const script = document.createElement('script');
                 script.src = src;
-                script.onload = resolve;
+                script.onload = () => resolve();
                 script.onerror = reject;
                 document.head.appendChild(script);
             });
@@ -784,11 +784,11 @@ export default function BriefBuilder() {
             });
     }, []);
 
-    const updateFormData = (key, value) => {
+    const updateFormData = (key: string, value: any) => {
         setFormData(prev => ({ ...prev, [key]: value }));
     };
 
-    const handleRoleSelect = (role) => {
+    const handleRoleSelect = (role: string) => {
         updateFormData('userRole', role);
         setWizardStarted(true);
     };
@@ -840,7 +840,7 @@ export default function BriefBuilder() {
     
     const nextStep = () => setStep(prev => Math.min(prev + 1, steps.length));
     const prevStep = () => setStep(prev => Math.max(prev - 1, 1));
-    const goToStep = (stepNumber) => setStep(stepNumber);
+    const goToStep = (stepNumber: number) => setStep(stepNumber);
 
     const renderStep = () => {
         const currentStepId = steps[step - 1]?.id;
