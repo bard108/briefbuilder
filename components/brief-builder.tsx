@@ -55,6 +55,14 @@ interface Step {
   icon: React.ReactNode;
 }
 
+// Extend the Window interface for global libraries
+declare global {
+    interface Window {
+        jspdf: any;
+        html2canvas: any;
+    }
+}
+
 
 // --- SVG ICONS ---
 // Using inline SVGs to keep everything in a single file.
@@ -189,14 +197,14 @@ const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose:
     );
 };
 
-const Input = ({ label, id, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { label: string, id: string }) => (
+const Input = ({ label, id, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { label: string; id: string }) => (
     <div>
         <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
         <input id={id} className="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" {...props} />
     </div>
 );
 
-const Select = ({ label, id, children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement> & { label: string, id: string, children: React.ReactNode }) => (
+const Select = ({ label, id, children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement> & { label: string; id: string; children: React.ReactNode }) => (
      <div>
         <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
         <select id={id} className="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" {...props}>
@@ -205,7 +213,7 @@ const Select = ({ label, id, children, ...props }: React.SelectHTMLAttributes<HT
     </div>
 );
 
-const Textarea = ({ label, id, ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { label: string, id: string }) => (
+const Textarea = ({ label, id, ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { label: string; id: string }) => (
     <div>
         <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
         <textarea id={id} rows={4} className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" {...props}></textarea>
@@ -260,7 +268,7 @@ const StartPage = ({ onSelectRole }: { onSelectRole: (role: string) => void }) =
     </div>
 );
 
-const ProjectDetailsStep = ({ data, updateData }: { data: FormData, updateData: (key: keyof FormData, value: FormData[keyof FormData]) => void }) => {
+const ProjectDetailsStep = ({ data, updateData }: { data: FormData; updateData: (key: keyof FormData, value: string) => void; }) => {
     const [isLoading, setIsLoading] = useState(false);
 
     const generateIdeas = async () => {
@@ -310,7 +318,7 @@ const ProjectDetailsStep = ({ data, updateData }: { data: FormData, updateData: 
     );
 };
 
-const ContactStep = ({ data, updateData }: { data: FormData, updateData: (key: keyof FormData, value: FormData[keyof FormData]) => void }) => (
+const ContactStep = ({ data, updateData }: { data: FormData; updateData: (key: keyof FormData, value: string) => void; }) => (
     <div className="space-y-6">
         <h2 className="text-2xl font-bold text-gray-800">Your Contact Information</h2>
         <p className="text-gray-600">How can the creative team get in touch with you to discuss this inquiry?</p>
@@ -323,7 +331,7 @@ const ContactStep = ({ data, updateData }: { data: FormData, updateData: (key: k
     </div>
 );
 
-const LocationShootDateStep = ({ data, updateData }: { data: FormData, updateData: (key: keyof FormData, value: FormData[keyof FormData]) => void }) => (
+const LocationShootDateStep = ({ data, updateData }: { data: FormData; updateData: (key: keyof FormData, value: string) => void; }) => (
      <div className="space-y-6">
         <h2 className="text-2xl font-bold text-gray-800">Shoot Dates & Location</h2>
         <p className="text-gray-600">Provide the planned dates and location details for the shoot.</p>
@@ -335,7 +343,7 @@ const LocationShootDateStep = ({ data, updateData }: { data: FormData, updateDat
     </div>
 );
 
-const MoodboardStep = ({ data, updateData }: { data: FormData, updateData: (key: keyof FormData, value: FormData[keyof FormData]) => void }) => {
+const MoodboardStep = ({ data, updateData }: { data: FormData; updateData: (key: keyof FormData, value: FormData[keyof FormData]) => void; }) => {
     const files = useMemo(() => data.moodboardFiles || [], [data.moodboardFiles]);
 
     const previews = useMemo(() => files.map((file: File) => URL.createObjectURL(file)), [files]);
@@ -411,7 +419,7 @@ const MoodboardStep = ({ data, updateData }: { data: FormData, updateData: (key:
 };
 
 
-const DeliverablesStep = ({ data, updateData }: { data: FormData, updateData: (key: string, value: any) => void }) => {
+const DeliverablesStep = ({ data, updateData }: { data: FormData; updateData: (key: keyof FormData, value: string[]) => void; }) => {
     const deliverableOptions = [
         { id: 'photography', label: 'Photography' }, { id: 'video', label: 'Video' },
         { id: 'socialAssets', label: 'Social Assets' }, { id: 'other', label: 'Other' },
@@ -431,7 +439,7 @@ const DeliverablesStep = ({ data, updateData }: { data: FormData, updateData: (k
     ];
 
     const handleCheckboxChange = (group: keyof FormData, id: string) => {
-        const currentSelection = data[group] as string[] || [];
+        const currentSelection = (data[group] as string[] | undefined) || [];
         const newSelection = currentSelection.includes(id) ? currentSelection.filter((item: string) => item !== id) : [...currentSelection, id];
         updateData(group, newSelection);
     };
@@ -465,7 +473,7 @@ const DeliverablesStep = ({ data, updateData }: { data: FormData, updateData: (k
     );
 };
 
-const ShotListStep = ({ data, updateData }: { data: FormData, updateData: (key: keyof FormData, value: any) => void }) => {
+const ShotListStep = ({ data, updateData }: { data: FormData; updateData: (key: keyof FormData, value: Shot[]) => void; }) => {
     const [isLoading, setIsLoading] = useState(false);
     const shotList = data.shotList || [];
 
@@ -561,7 +569,7 @@ const ShotListStep = ({ data, updateData }: { data: FormData, updateData: (key: 
     );
 };
 
-const CallSheetStep = ({ data, updateData }: { data: FormData, updateData: (key: keyof FormData, value: any) => void }) => {
+const CallSheetStep = ({ data, updateData }: { data: FormData; updateData: (key: keyof FormData, value: any) => void; }) => {
     const [isLoading, setIsLoading] = useState(false);
     const crew = data.crew || [];
 
@@ -647,13 +655,13 @@ const ReviewStep = ({ data, scriptsLoaded }: { data: FormData, scriptsLoaded: bo
     const shareLinkRef = useRef(null);
 
     const handleDownloadPdf = () => {
-        if (!scriptsLoaded || !(window as any).jspdf || !(window as any).html2canvas) {
+        if (!scriptsLoaded || !window.jspdf || !window.html2canvas) {
             alert("PDF generation library is still loading. Please wait a moment and try again.");
             return;
         }
-        const { jsPDF } = (window as any).jspdf;
+        const { jsPDF } = window.jspdf;
         const input = briefContentRef.current;
-        (window as any).html2canvas(input, { scale: 2 }).then((canvas: HTMLCanvasElement) => {
+        window.html2canvas(input, { scale: 2 }).then((canvas: HTMLCanvasElement) => {
             const imgData = canvas.toDataURL('image/png');
             const pdf = new jsPDF('p', 'mm', 'a4');
             const pdfWidth = pdf.internal.pageSize.getWidth();
@@ -719,7 +727,7 @@ const ReviewStep = ({ data, scriptsLoaded }: { data: FormData, scriptsLoaded: bo
                 <h2 className="text-2xl font-bold text-gray-800">Review & Distribute</h2>
                 <p className="text-gray-600">Please review all the details below. Once you&apos;re happy, choose how you&apos;d like to share or save the document.</p>
                 <div id="brief-content-for-pdf" ref={briefContentRef} className="space-y-8 p-6 bg-white rounded-lg border border-gray-200">
-                    {Object.entries(data).map(([key, value]: [string, any]) => {
+                    {Object.entries(data).map(([key, value]) => {
                         if (!value || (Array.isArray(value) && value.length === 0)) return null;
                         
                         let content;
@@ -902,10 +910,10 @@ export default function BriefBuilder() {
         const currentStepId = steps[step - 1]?.id;
         switch (currentStepId) {
             case 'details': return <ProjectDetailsStep data={formData} updateData={updateFormData} />;
-            case 'moodboard': return <MoodboardStep data={formData} updateData={updateFormData} />;
+            case 'moodboard': return <MoodboardStep data={formData} updateData={updateData} />;
             case 'contact': return <ContactStep data={formData} updateData={updateFormData} />;
-            case 'location': return <LocationShootDateStep data={formData} updateData={updateFormData} />;
-            case 'deliverables': return <DeliverablesStep data={formData} updateData={updateData} />;
+            case 'location': return <LocationShootDateStep data={formData} updateData={updateData} />;
+            case 'deliverables': return <DeliverablesStep data={formData} updateData={updateFormData} />;
             case 'shotlist': return <ShotListStep data={formData} updateData={updateFormData} />;
             case 'callsheet': return <CallSheetStep data={formData} updateData={updateData} />;
             case 'review': return <ReviewStep data={formData} scriptsLoaded={scriptsLoaded} />;
