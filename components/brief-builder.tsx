@@ -605,16 +605,18 @@ const ReviewStep = ({ data, scriptsLoaded }) => {
             const canvasWidth = canvas.width;
             const canvasHeight = canvas.height;
             const ratio = canvasWidth / canvasHeight;
-            let width = pdfWidth;
-            let height = width / ratio;
-            const position = 0;
-
-            if (height > pdfHeight) {
-                height = pdfHeight;
-                // width = height * ratio; // This line is not needed and might cause issues
-            }
             
-            pdf.addImage(imgData, 'PNG', 0, position, width, height);
+            let finalWidth = pdfWidth;
+            let finalHeight = finalWidth / ratio;
+    
+            if (finalHeight > pdfHeight) {
+                finalHeight = pdfHeight;
+                finalWidth = finalHeight * ratio;
+            }
+    
+            const position = 0;
+            
+            pdf.addImage(imgData, 'PNG', position, position, finalWidth, finalHeight);
             
             pdf.save(`brief-${data.projectName?.replace(/\s+/g, '-') || 'download'}.pdf`);
         });
