@@ -55,10 +55,17 @@ interface Step {
   icon: React.ReactNode;
 }
 
+type StepProps = {
+  data: FormData;
+  updateData: (key: keyof FormData, value: FormData[keyof FormData]) => void;
+};
+
 // Extend the Window interface for global libraries
 declare global {
     interface Window {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         jspdf: any;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         html2canvas: any;
     }
 }
@@ -132,7 +139,6 @@ const SparklesIcon = ({ className }: { className: string }) => (
 );
 
 // --- API HELPER ---
-// This function calls the Gemini API.
 async function callGeminiAPI(prompt: string, jsonSchema: Record<string, unknown> | null = null) {
   const apiKey = ""; // This will be handled by the environment.
   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
@@ -268,7 +274,7 @@ const StartPage = ({ onSelectRole }: { onSelectRole: (role: string) => void }) =
     </div>
 );
 
-const ProjectDetailsStep = ({ data, updateData }: { data: FormData; updateData: (key: keyof FormData, value: string) => void; }) => {
+const ProjectDetailsStep = ({ data, updateData }: StepProps) => {
     const [isLoading, setIsLoading] = useState(false);
 
     const generateIdeas = async () => {
@@ -318,7 +324,7 @@ const ProjectDetailsStep = ({ data, updateData }: { data: FormData; updateData: 
     );
 };
 
-const ContactStep = ({ data, updateData }: { data: FormData; updateData: (key: keyof FormData, value: string) => void; }) => (
+const ContactStep = ({ data, updateData }: StepProps) => (
     <div className="space-y-6">
         <h2 className="text-2xl font-bold text-gray-800">Your Contact Information</h2>
         <p className="text-gray-600">How can the creative team get in touch with you to discuss this inquiry?</p>
@@ -331,7 +337,7 @@ const ContactStep = ({ data, updateData }: { data: FormData; updateData: (key: k
     </div>
 );
 
-const LocationShootDateStep = ({ data, updateData }: { data: FormData; updateData: (key: keyof FormData, value: string) => void; }) => (
+const LocationShootDateStep = ({ data, updateData }: StepProps) => (
      <div className="space-y-6">
         <h2 className="text-2xl font-bold text-gray-800">Shoot Dates & Location</h2>
         <p className="text-gray-600">Provide the planned dates and location details for the shoot.</p>
@@ -343,7 +349,7 @@ const LocationShootDateStep = ({ data, updateData }: { data: FormData; updateDat
     </div>
 );
 
-const MoodboardStep = ({ data, updateData }: { data: FormData; updateData: (key: keyof FormData, value: FormData[keyof FormData]) => void; }) => {
+const MoodboardStep = ({ data, updateData }: StepProps) => {
     const files = useMemo(() => data.moodboardFiles || [], [data.moodboardFiles]);
 
     const previews = useMemo(() => files.map((file: File) => URL.createObjectURL(file)), [files]);
@@ -419,7 +425,7 @@ const MoodboardStep = ({ data, updateData }: { data: FormData; updateData: (key:
 };
 
 
-const DeliverablesStep = ({ data, updateData }: { data: FormData; updateData: (key: keyof FormData, value: string[]) => void; }) => {
+const DeliverablesStep = ({ data, updateData }: StepProps) => {
     const deliverableOptions = [
         { id: 'photography', label: 'Photography' }, { id: 'video', label: 'Video' },
         { id: 'socialAssets', label: 'Social Assets' }, { id: 'other', label: 'Other' },
@@ -473,7 +479,7 @@ const DeliverablesStep = ({ data, updateData }: { data: FormData; updateData: (k
     );
 };
 
-const ShotListStep = ({ data, updateData }: { data: FormData; updateData: (key: keyof FormData, value: Shot[]) => void; }) => {
+const ShotListStep = ({ data, updateData }: StepProps) => {
     const [isLoading, setIsLoading] = useState(false);
     const shotList = data.shotList || [];
 
@@ -505,7 +511,8 @@ const ShotListStep = ({ data, updateData }: { data: FormData; updateData: (key: 
         
         if (result) {
             try {
-                const newShots = JSON.parse(result).map((shot: Omit<Shot, 'id' | 'priority'>) => ({ ...shot, id: Date.now() + Math.random(), priority: false }));
+                const newShotsData = JSON.parse(result) as Omit<Shot, 'id' | 'priority'>[];
+                const newShots = newShotsData.map((shot) => ({ ...shot, id: Date.now() + Math.random(), priority: false }));
                 updateData('shotList', [...shotList, ...newShots]);
             } catch (e) {
                 console.error("Failed to parse shot list JSON:", e);
@@ -569,7 +576,7 @@ const ShotListStep = ({ data, updateData }: { data: FormData; updateData: (key: 
     );
 };
 
-const CallSheetStep = ({ data, updateData }: { data: FormData; updateData: (key: keyof FormData, value: any) => void; }) => {
+const CallSheetStep = ({ data, updateData }: StepProps) => {
     const [isLoading, setIsLoading] = useState(false);
     const crew = data.crew || [];
 
@@ -727,7 +734,8 @@ const ReviewStep = ({ data, scriptsLoaded }: { data: FormData, scriptsLoaded: bo
                 <h2 className="text-2xl font-bold text-gray-800">Review & Distribute</h2>
                 <p className="text-gray-600">Please review all the details below. Once you&apos;re happy, choose how you&apos;d like to share or save the document.</p>
                 <div id="brief-content-for-pdf" ref={briefContentRef} className="space-y-8 p-6 bg-white rounded-lg border border-gray-200">
-                    {Object.entries(data).map(([key, value]) => {
+                    {(Object.keys(data) as Array<keyof typeof data>).map((key) => {
+                        const value = data[key];
                         if (!value || (Array.isArray(value) && value.length === 0)) return null;
                         
                         let content;
@@ -910,11 +918,11 @@ export default function BriefBuilder() {
         const currentStepId = steps[step - 1]?.id;
         switch (currentStepId) {
             case 'details': return <ProjectDetailsStep data={formData} updateData={updateFormData} />;
-            case 'moodboard': return <MoodboardStep data={formData} updateData={updateData} />;
-            case 'contact': return <ContactStep data={formData} updateData={updateFormData} />;
+            case 'moodboard': return <MoodboardStep data={formData} updateData={updateFormData} />;
+            case 'contact': return <ContactStep data={formData} updateData={updateData} />;
             case 'location': return <LocationShootDateStep data={formData} updateData={updateData} />;
-            case 'deliverables': return <DeliverablesStep data={formData} updateData={updateFormData} />;
-            case 'shotlist': return <ShotListStep data={formData} updateData={updateFormData} />;
+            case 'deliverables': return <DeliverablesStep data={formData} updateData={updateData} />;
+            case 'shotlist': return <ShotListStep data={formData} updateData={updateData} />;
             case 'callsheet': return <CallSheetStep data={formData} updateData={updateData} />;
             case 'review': return <ReviewStep data={formData} scriptsLoaded={scriptsLoaded} />;
             default: return <div>Loading...</div>;
