@@ -157,53 +157,27 @@ const SparklesIcon = ({ className }: { className: string }) => (
 
 // --- API HELPER ---
 async function callGeminiAPI(prompt: string, jsonSchema: Record<string, unknown> | null = null) {
-  const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-  if (!apiKey) {
-    console.error('Gemini API key not found in environment variables');
-    return null;
-  }
-  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+    try {
+        const resp = await fetch('/api/gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt, jsonSchema }),
+        });
 
-  const payload: {
-    contents: { parts: { text: string }[] }[];
-    generationConfig?: { responseMimeType: string; responseSchema: Record<string, unknown> };
-  } = {
-    contents: [{ parts: [{ text: prompt }] }],
-  };
+        if (!resp.ok) {
+            const errText = await resp.text();
+            console.error('Gemini proxy error:', errText);
+            return null;
+        }
 
-  if (jsonSchema) {
-    payload.generationConfig = {
-      responseMimeType: "application/json",
-      responseSchema: jsonSchema,
-    };
-  }
-
-  try {
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
-    if (!response.ok) {
-        const errorBody = await response.text();
-        console.error("API Error Response:", errorBody);
-        throw new Error(`API request failed with status ${response.status}`);
+        const json = await resp.json();
+        // server returns { text } where text is the raw response body from the Gemini API
+        if (json && typeof json.text === 'string') return json.text;
+        return null;
+    } catch (err) {
+        console.error('callGeminiAPI error:', err);
+        return null;
     }
-
-    const result = await response.json();
-    const candidate = result.candidates?.[0];
-    
-    if (candidate && candidate.content?.parts?.[0]?.text) {
-        return candidate.content.parts[0].text;
-    } else {
-        console.error("Unexpected API response structure:", JSON.stringify(result, null, 2));
-        throw new Error("Invalid response from Gemini API.");
-    }
-  } catch (error) {
-    console.error("Error calling Gemini API:", error);
-    return null;
-  }
 }
 
 
@@ -687,40 +661,63 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
     const briefContentRef = useRef(null);
     const shareLinkRef = useRef(null);
 
-    const handleDownloadPdf = () => {
-        if (!scriptsLoaded || !window.jspdf || !window.html2canvas) {
-            alert("PDF generation library is still loading. Please wait a moment and try again.");
-            return;
-        }
-        const { jsPDF } = window.jspdf;
-        const input = briefContentRef.current;
-        if (!input) {
-            alert("Content not ready for PDF generation.");
-            return;
-        }
-        window.html2canvas(input, { scale: 2 }).then((canvas: HTMLCanvasElement) => {
+    const handleDownloadPdf = async () => {
+        try {
+            const input = briefContentRef.current as HTMLElement | null;
+            if (!input) {
+                alert("Content not ready for PDF generation.");
+                return;
+            }
+
+            // Prefer window-loaded libs (CDN) if present, otherwise dynamically import npm packages
+            let jsPDFConstructor: any = null;
+            let html2canvasFunc: any = null;
+
+            if (window.jspdf && window.html2canvas) {
+                jsPDFConstructor = window.jspdf.jsPDF || window.jspdf;
+                html2canvasFunc = window.html2canvas;
+            } else {
+                const imports: any = await Promise.all([import('jspdf'), import('html2canvas')]);
+                const maybeJsPdf = imports[0];
+                const maybeHtml2Canvas = imports[1];
+                jsPDFConstructor = (maybeJsPdf && (maybeJsPdf.jsPDF || maybeJsPdf)) || null;
+                html2canvasFunc = (maybeHtml2Canvas && (maybeHtml2Canvas.default || maybeHtml2Canvas)) || null;
+            }
+
+            if (!jsPDFConstructor || !html2canvasFunc) {
+                console.error('PDF libraries not available', { jsPDFConstructor, html2canvasFunc });
+                alert('PDF generation libraries are not available.');
+                return;
+            }
+
+            const canvas: HTMLCanvasElement = await html2canvasFunc(input, { scale: 2 });
             const imgData = canvas.toDataURL('image/png');
-            const pdf = new jsPDF();
+
+            // jsPDF may be exported as a class under jsPDF or as a namespace with jsPDF member
+            const PDFClass = jsPDFConstructor.jsPDF ? jsPDFConstructor.jsPDF : jsPDFConstructor;
+            const pdf = new PDFClass();
+
             const pdfWidth = pdf.internal.pageSize.getWidth();
             const pdfHeight = pdf.internal.pageSize.getHeight();
             const canvasWidth = canvas.width;
             const canvasHeight = canvas.height;
             const ratio = canvasWidth / canvasHeight;
-            
+
             let finalWidth = pdfWidth;
             let finalHeight = finalWidth / ratio;
-    
+
             if (finalHeight > pdfHeight) {
                 finalHeight = pdfHeight;
                 finalWidth = finalHeight * ratio;
             }
-    
+
             const position = 0;
-            
             pdf.addImage(imgData, 'PNG', position, position, finalWidth, finalHeight);
-            
             pdf.save(`brief-${data.projectName?.replace(/\s+/g, '-') || 'download'}.pdf`);
-        });
+        } catch (err) {
+            console.error('Error generating PDF:', err);
+            alert('Failed to generate PDF. See console for details.');
+        }
     };
 
     const handleShare = () => {
@@ -747,15 +744,35 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
             return;
         }
         setIsSending(true);
-        // Simulate an API call to your email service (e.g., Resend)
-        console.log("Sending brief to:", emailRecipients);
-        console.log("Brief data:", data);
-        setTimeout(() => {
-            setIsSending(false);
-            setEmailModalOpen(false);
-            setEmailRecipients('');
-            // Optionally, show a success message
-        }, 1500); // Simulate network delay
+
+        (async () => {
+            try {
+                // Prepare basic HTML summary from the brief content
+                const htmlContent = document.getElementById('brief-content-for-pdf')?.outerHTML || JSON.stringify(data, null, 2);
+                const recipients = emailRecipients.split(',').map(s => s.trim()).filter(Boolean);
+
+                const resp = await fetch('/api/email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ recipients, subject: `Brief: ${data.projectName || 'Untitled'}`, html: htmlContent }),
+                });
+
+                const json = await resp.json();
+                if (!resp.ok) {
+                    console.error('Email send failed:', json);
+                    alert(`Failed to send email: ${json?.error || resp.statusText}`);
+                } else {
+                    alert('Email sent successfully');
+                    setEmailModalOpen(false);
+                    setEmailRecipients('');
+                }
+            } catch (err) {
+                console.error('Error sending email:', err);
+                alert('Failed to send email. See console for details.');
+            } finally {
+                setIsSending(false);
+            }
+        })();
     };
 
     return (
