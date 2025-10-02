@@ -906,286 +906,26 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
     const [includeSelf, setIncludeSelf] = useState<boolean>(!!data.clientEmail);
     const [additionalRecipients, setAdditionalRecipients] = useState('');
     const [isSending, setIsSending] = useState(false);
-    const briefContentRef = useRef(null);
-    const shareLinkRef = useRef(null);
+    const briefContentRef = useRef<HTMLDivElement | null>(null);
+    const shareLinkRef = useRef<HTMLInputElement | null>(null);
 
     const handleDownloadPdf = async () => {
         try {
             const input = briefContentRef.current as HTMLElement | null;
-            if (!input) {
-                alert("Content not ready for PDF generation.");
-                return;
-            }
-
-            // Prefer window-loaded libs (CDN) if present, otherwise dynamically import npm packages
-            let jsPDFConstructor: any = null;
-            let html2canvasFunc: any = null;
-
-            if (window.jspdf && window.html2canvas) {
-                jsPDFConstructor = window.jspdf.jsPDF || window.jspdf;
-                html2canvasFunc = window.html2canvas;
-            } else {
-                const imports: any = await Promise.all([import('jspdf'), import('html2canvas')]);
-                const maybeJsPdf = imports[0];
-                const maybeHtml2Canvas = imports[1];
-                jsPDFConstructor = (maybeJsPdf && (maybeJsPdf.jsPDF || maybeJsPdf)) || null;
-                html2canvasFunc = (maybeHtml2Canvas && (maybeHtml2Canvas.default || maybeHtml2Canvas)) || null;
-            }
-
-            if (!jsPDFConstructor || !html2canvasFunc) {
-                console.error('PDF libraries not available', { jsPDFConstructor, html2canvasFunc });
-                alert('PDF generation libraries are not available.');
-                return;
-            }
-
-            // Clone the node and inline computed color-related styles to avoid html2canvas parsing unsupported CSS functions (e.g., oklch)
-            const clone = input.cloneNode(true) as HTMLElement;
-            // Walk originals and clones in parallel and copy computed color styles
-            const originals = Array.from(input.querySelectorAll('*')) as HTMLElement[];
-            const clones = Array.from(clone.querySelectorAll('*')) as HTMLElement[];
-            // also include the root element
-            originals.unshift(input as HTMLElement);
-            clones.unshift(clone as HTMLElement);
-
-            const propsToCopy = ['color','backgroundColor','borderColor','fill','stroke','boxShadow','backgroundImage'];
-
-            const resolveToComputed = (value: string, property: string) => {
-                try {
-                    // try to resolve complex color functions (oklch, color-mix) or CSS vars by
-                    // applying them to a temporary element and reading the computed value.
-                    const tmp = document.createElement('div');
-                    tmp.style.position = 'absolute';
-                    tmp.style.left = '-9999px';
-                    // set the property (use camelCase for style access)
-                    (tmp.style as any)[property] = value;
-                    document.body.appendChild(tmp);
-                    const resolved = (window.getComputedStyle(tmp) as any)[property];
-                    document.body.removeChild(tmp);
-                    return resolved || value;
-                } catch (e) {
-                    return value;
-                }
-            };
-
-            originals.forEach((origEl, i) => {
-                const clonedEl = clones[i];
-                if (!clonedEl) return;
-                const style = window.getComputedStyle(origEl);
-                propsToCopy.forEach((prop) => {
-                    try {
-                        let val = (style as any)[prop] as string;
-                        if (val && val !== 'transparent' && val !== 'none') {
-                            // If the value references CSS variables or contains oklch/color-mix, try to resolve
-                            if (val.includes('var(') || val.includes('oklch(') || val.includes('color-mix(')) {
-                                const resolved = resolveToComputed(val, prop);
-                                if (resolved) val = resolved;
-                            }
-
-                            // convert camelCase to hyphen-case for setting style property
-                            const cssProp = prop.replace(/[A-Z]/g, m => '-' + m.toLowerCase());
-                            clonedEl.style.setProperty(cssProp, val as string, 'important');
-                        }
-                    } catch (e) {
-                        // ignore
-                    }
-                });
-            });
-
-            // Resolve any CSS custom properties (variables) used by the clone that contain unsupported functions like oklch()
-            try {
-                const cssVars = new Set<string>();
-                const allStyles = window.getComputedStyle(document.documentElement).cssText || '';
-                // Collect variables that have 'oklch' in the global computed style
-                const varRegex = /--[\w-]+/g;
-                const matches = allStyles.match(varRegex) || [];
-                matches.forEach(v => {
-                    const val = window.getComputedStyle(document.documentElement).getPropertyValue(v).trim();
-                    if (val && val.includes('oklch(')) cssVars.add(v);
-                });
-
-                // Also search inline styles of the clone for var(--*) usages
-                const cloneCssText = clone.outerHTML;
-                const varUsageRegex = /var\((--[\w-]+)\)/g;
-                let m;
-                while ((m = varUsageRegex.exec(cloneCssText)) !== null) {
-                    cssVars.add(m[1]);
-                }
-
-                // Inline resolved values for those variables on the clone root
-                cssVars.forEach(v => {
-                    const resolved = window.getComputedStyle(document.documentElement).getPropertyValue(v).trim();
-                    if (resolved) clone.style.setProperty(v, resolved);
-                });
-            } catch (e) {
-                // ignore
-            }
-
-            // place clone offscreen so images/fonts can load
-            // Also apply a minimal "print" fallback stylesheet to the clone that avoids
-            // complex CSS functions (oklch) and removes backgrounds/gradients/shadows.
-            const safePrintCss = `
-              * { color: inherit !important; background: transparent !important; background-image: none !important; box-shadow: none !important; filter: none !important; }
-              body, html, #root { background: #ffffff !important; }
-            `;
-
-            const styleEl = document.createElement('style');
-            styleEl.setAttribute('data-briefprint', '1');
-            styleEl.appendChild(document.createTextNode(safePrintCss));
-            clone.insertBefore(styleEl, clone.firstChild);
-
-            // Ensure any remaining CSS custom properties on the clone root are resolved to
-            // concrete values (attempt again, after injecting safe CSS) to remove oklch values.
-            try {
-                const allProps = window.getComputedStyle(clone);
-                for (let i = 0; i < allProps.length; i++) {
-                    const name = allProps[i];
-                    if (name.startsWith('--')) {
-                        const val = window.getComputedStyle(clone).getPropertyValue(name).trim();
-                        if (val && !val.includes('var(') && !val.includes('oklch(')) {
-                            clone.style.setProperty(name, val);
-                        } else if (val && val.includes('oklch(')) {
-                            // If it still contains oklch, try to read from documentElement and resolve to computed rgb
-                            const resolved = window.getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-                            if (resolved && !resolved.includes('oklch(')) clone.style.setProperty(name, resolved);
-                        }
-                    }
-                }
-            } catch (e) {
-                // ignore resolution issues
-            }
-
-            clone.style.position = 'absolute';
-            clone.style.left = '-9999px';
-            clone.style.top = '0';
-            document.body.appendChild(clone);
-
-            let canvas: HTMLCanvasElement | null = null;
-            try {
-                canvas = await html2canvasFunc(clone, { scale: 2 });
-                // remove clone after rendering
-                document.body.removeChild(clone);
-            } catch (e: any) {
-                console.warn('html2canvas primary render failed, attempting text-only fallback', e);
-                // Ensure clone is removed
-                try { document.body.removeChild(clone); } catch (_) {}
-
-                // If the error mentions unsupported color function (oklch) or similar, create a
-                // simplified, safe snapshot containing only the textual content and basic layout.
-                const safeSnapshot = document.createElement('div');
-                safeSnapshot.style.position = 'absolute';
-                safeSnapshot.style.left = '-9999px';
-                safeSnapshot.style.top = '0';
-                safeSnapshot.style.width = (input.offsetWidth || 800) + 'px';
-                safeSnapshot.style.padding = '28px';
-                safeSnapshot.style.background = '#ffffff';
-                safeSnapshot.style.color = '#0f172a';
-                safeSnapshot.style.fontFamily = 'Inter, Arial, Helvetica, sans-serif';
-                safeSnapshot.style.fontSize = '13px';
-                safeSnapshot.style.lineHeight = '1.45';
-                safeSnapshot.style.whiteSpace = 'pre-wrap';
-
-                // Build a cleaner HTML snapshot: header with title, creator and date, and a bordered content region
-                const title = document.createElement('div');
-                title.style.display = 'flex';
-                title.style.justifyContent = 'space-between';
-                title.style.alignItems = 'baseline';
-                title.style.marginBottom = '18px';
-
-                const h = document.createElement('h1');
-                h.textContent = data.projectName || 'Untitled Brief';
-                h.style.fontSize = '20px';
-                h.style.margin = '0';
-                h.style.fontWeight = '700';
-                h.style.color = '#0b1220';
-
-                const meta = document.createElement('div');
-                meta.style.fontSize = '12px';
-                meta.style.color = '#475569';
-                const creator = data.clientName || (data.userRole ? `${data.userRole}` : 'Unknown');
-                const created = new Date().toLocaleString();
-                meta.textContent = `Created by ${creator} • ${created}`;
-
-                title.appendChild(h);
-                title.appendChild(meta);
-
-                const contentBox = document.createElement('div');
-                contentBox.style.border = '1px solid #e6edf3';
-                contentBox.style.padding = '16px';
-                contentBox.style.borderRadius = '6px';
-                contentBox.style.background = '#ffffff';
-                contentBox.style.color = '#0b1220';
-
-                // Build content using the input's sections but simplified
-                const sections = input.querySelectorAll(':scope > div') as NodeListOf<HTMLElement>;
-                if (sections.length > 0) {
-                    sections.forEach((sec: HTMLElement) => {
-                        const secTitleEl = sec.querySelector('h3, h2, h1');
-                        const secTitle = secTitleEl ? secTitleEl.textContent : '';
-                        const text = (sec.innerText || sec.textContent || '');
-                        const sdiv = document.createElement('div');
-                        sdiv.style.marginBottom = '12px';
-                        if (secTitle) {
-                            const tlh = document.createElement('div');
-                            tlh.textContent = secTitle;
-                            tlh.style.fontWeight = '600';
-                            tlh.style.marginBottom = '6px';
-                            tlh.style.color = '#0b1220';
-                            sdiv.appendChild(tlh);
-                        }
-                        const p = document.createElement('div');
-                        p.textContent = text.replace(/\n\s*\n/g, '\n');
-                        p.style.whiteSpace = 'pre-wrap';
-                        p.style.color = '#0b1220';
-                        sdiv.appendChild(p);
-                        contentBox.appendChild(sdiv);
-                    });
-                } else {
-                    const p = document.createElement('div');
-                    p.textContent = input.innerText || input.textContent || '';
-                    p.style.whiteSpace = 'pre-wrap';
-                    contentBox.appendChild(p);
-                }
-
-                safeSnapshot.appendChild(title);
-                safeSnapshot.appendChild(contentBox);
-                document.body.appendChild(safeSnapshot);
-
-                try {
-                    canvas = await html2canvasFunc(safeSnapshot, { scale: 2 });
-                } catch (e2) {
-                    console.error('Fallback html2canvas render failed', e2);
-                    try { document.body.removeChild(safeSnapshot); } catch (_) {}
-                    throw e2;
-                }
-
-                try { document.body.removeChild(safeSnapshot); } catch (_) {}
-            }
-            if (!canvas) {
-                throw new Error('Failed to render canvas for PDF generation');
-            }
-
+            if (!input) { alert('Content not ready for PDF generation.'); return; }
+            let jsPDFConstructor: any = null; let html2canvasFunc: any = null;
+            if (window.jspdf && window.html2canvas) { jsPDFConstructor = window.jspdf.jsPDF || window.jspdf; html2canvasFunc = window.html2canvas; }
+            else { const imports: any = await Promise.all([import('jspdf'), import('html2canvas')]); jsPDFConstructor = (imports[0] && (imports[0].jsPDF || imports[0])) || null; html2canvasFunc = (imports[1] && (imports[1].default || imports[1])) || null; }
+            if (!jsPDFConstructor || !html2canvasFunc) { alert('PDF generation libraries are not available.'); return; }
+            const canvas = await html2canvasFunc(input, { scale: 2 });
             const imgData = canvas.toDataURL('image/png');
-
-            // jsPDF may be exported as a class under jsPDF or as a namespace with jsPDF member
             const PDFClass = jsPDFConstructor.jsPDF ? jsPDFConstructor.jsPDF : jsPDFConstructor;
             const pdf = new PDFClass();
-
             const pdfWidth = pdf.internal.pageSize.getWidth();
             const pdfHeight = pdf.internal.pageSize.getHeight();
-            const canvasWidth = canvas.width;
-            const canvasHeight = canvas.height;
-            const ratio = canvasWidth / canvasHeight;
-
-            let finalWidth = pdfWidth;
-            let finalHeight = finalWidth / ratio;
-
-            if (finalHeight > pdfHeight) {
-                finalHeight = pdfHeight;
-                finalWidth = finalHeight * ratio;
-            }
-
-            const position = 0;
-            pdf.addImage(imgData, 'PNG', position, position, finalWidth, finalHeight);
+            const ratio = canvas.width / canvas.height;
+            let finalWidth = pdfWidth; let finalHeight = finalWidth / ratio; if (finalHeight > pdfHeight) { finalHeight = pdfHeight; finalWidth = finalHeight * ratio; }
+            pdf.addImage(imgData, 'PNG', 0, 0, finalWidth, finalHeight);
             pdf.save(`brief-${data.projectName?.replace(/\s+/g, '-') || 'download'}.pdf`);
         } catch (err) {
             console.error('Error generating PDF:', err);
@@ -1194,7 +934,6 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
     };
 
     const handleShare = () => {
-        // In a real app, this would involve saving the data and generating a unique
         const mockToken = Math.random().toString(36).substring(2, 10);
         const link = `${window.location.origin}/share/${mockToken}`;
         setShareLink(link);
@@ -1202,249 +941,163 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
     };
 
     const copyToClipboard = () => {
-        const linkInput = shareLinkRef.current  as HTMLInputElement | null;
-        if (linkInput) {
-            linkInput.select();
-            // Use execCommand for broader compatibility within iFrames
-            document.execCommand('copy');
-            // You might want to show a "Copied!" message to the user
-        }
+        const el = shareLinkRef.current; if (!el) return; el.select(); document.execCommand('copy');
     };
-    
+
     const handleSendEmail = () => {
         const rawSelf = includeSelf && data.clientEmail ? [data.clientEmail] : [];
-        const others = additionalRecipients
-            .split(',')
-            .map(s => s.trim())
-            .filter(Boolean);
+        const others = additionalRecipients.split(',').map(s => s.trim()).filter(Boolean);
         const recipients = Array.from(new Set([...rawSelf, ...others]));
-
-        if (recipients.length === 0) {
-            alert('Please select "Send to my email" or add at least one recipient.');
-            return;
-        }
+        if (!recipients.length) { alert('Please select "Send to my email" or add at least one recipient.'); return; }
         setIsSending(true);
-
         (async () => {
             try {
-                const htmlContent = document.getElementById('brief-content-for-pdf')?.outerHTML || JSON.stringify(data, null, 2);
-                const resp = await fetch('/api/email', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ recipients, subject: `Brief: ${data.projectName || 'Untitled'}`, html: htmlContent }),
-                });
+                const htmlContent = briefContentRef.current?.outerHTML || JSON.stringify(data, null, 2);
+                const resp = await fetch('/api/email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ recipients, subject: `Brief: ${data.projectName || 'Untitled'}`, html: htmlContent }) });
                 const json = await resp.json();
-                if (!resp.ok) {
-                    console.error('Email send failed:', json);
-                    alert(`Failed to send email: ${json?.error || resp.statusText}`);
-                } else {
-                    alert('Email sent successfully');
-
-                    setEmailModalOpen(false);
-                    setAdditionalRecipients('');
-                }
-            } catch (err) {
-                console.error('Error sending email:', err);
-                alert('Failed to send email. See console for details.');
-            } finally {
-                setIsSending(false);
-            }
+                if (!resp.ok) { console.error('Email send failed:', json); alert(`Failed to send email: ${json?.error || resp.statusText}`); }
+                else { alert('Email sent successfully'); setEmailModalOpen(false); setAdditionalRecipients(''); }
+            } catch (err) { console.error('Error sending email:', err); alert('Failed to send email.'); }
+            finally { setIsSending(false); }
         })();
     };
 
-    const handleCloseModal = () => {
-        setEmailModalOpen(false);
-        setShareModalOpen(false);
-    };
-
     return (
-        <>
-            <div className="space-y-6">
-                <h2 className="text-2xl font-bold text-gray-800">Review Your Brief</h2>
-                <p className="text-gray-600">Double-check the information below and choose how to proceed.</p>
-                
-                {/* Brief content summary */}
-                <div id="brief-content-for-pdf" className="space-y-4">
+        <div className="space-y-6">
+            <h2 className="text-2xl font-bold text-gray-800">Review & Distribute</h2>
+            <p className="text-gray-600">Please review all the details below. Once you&apos;re happy, choose how you&apos;d like to share or save the document.</p>
+
+            <div id="brief-content-for-pdf" ref={briefContentRef} className="space-y-6 p-6 bg-white rounded-lg border border-gray-200">
+                <div className="flex items-baseline justify-between mb-2">
+                    <h1 className="text-xl font-bold text-gray-900">{data.projectName || 'Untitled Brief'}</h1>
+                    <div className="text-xs text-gray-500">Created by {data.clientName || data.userRole || 'Unknown'} • {new Date().toLocaleDateString()}</div>
+                </div>
+                <div className="h-px bg-gray-200" />
+
+                {(data.projectName || data.projectType || data.budget || data.overview || data.objectives || data.audience) && (
                     <div>
-                        <h3 className="text-lg font-semibold text-gray-800">Project Details</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-2">Project Details</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-700">
                             {data.projectName && <div><span className="font-medium">Project Name:</span> {data.projectName}</div>}
                             {data.projectType && <div><span className="font-medium">Project Type:</span> {data.projectType}</div>}
                             {data.budget && <div><span className="font-medium">Budget:</span> {data.budget}</div>}
                         </div>
                         {data.overview && <p className="mt-2 text-sm text-gray-700"><span className="font-medium">Overview:</span> {data.overview}</p>}
-                        {data.objectives && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Objectives:</span> {data.objectives}</p>}
+                        {data.objectives && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Objectives:</span><br/>{data.objectives}</p>}
                         {data.audience && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Audience:</span> {data.audience}</p>}
                     </div>
+                )}
 
+                {(data.clientName || data.clientCompany || data.clientEmail || data.clientPhone) && (
                     <div>
-                        <h3 className="text-lg font-semibold text-gray-800">Contact Information</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-2">Contact</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-700">
                             {data.clientName && <div><span className="font-medium">Name:</span> {data.clientName}</div>}
                             {data.clientCompany && <div><span className="font-medium">Company:</span> {data.clientCompany}</div>}
                             {data.clientEmail && <div><span className="font-medium">Email:</span> {data.clientEmail}</div>}
                             {data.clientPhone && <div><span className="font-medium">Phone:</span> {data.clientPhone}</div>}
                         </div>
                     </div>
+                )}
 
+                {(data.shootDates || data.shootStatus || data.location) && (
                     <div>
-                        <h3 className="text-lg font-semibold text-gray-800">Shoot Dates & Location</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-2">Dates & Location</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-700">
                             {data.shootDates && <div><span className="font-medium">Dates:</span> {data.shootDates}</div>}
                             {data.shootStatus && <div><span className="font-medium">Status:</span> {data.shootStatus}</div>}
                         </div>
                         {data.location && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Location:</span> {data.location}</p>}
                     </div>
+                )}
 
+                {(data.moodboardLink || (data.moodboardFiles && data.moodboardFiles.length)) && (
                     <div>
-                        <h3 className="text-lg font-semibold text-gray-800">Moodboard</h3>
+                        <h3 className="text-lg font-semibold text-gray-800 mb-2">Moodboard</h3>
                         {data.moodboardLink && <div className="text-sm text-blue-700 underline break-all">{data.moodboardLink}</div>}
                         {data.moodboardFiles && data.moodboardFiles.length > 0 && (
-                            <div className="mt-2 text-sm text-gray-700">{data.moodboardFiles.map(f => f.name).join(', ')}</div>
+                            <div className="mt-2 text-sm text-gray-700">{data.moodboardFiles.map((f: File) => f.name).join(', ')}</div>
                         )}
                     </div>
+                )}
 
+                {(data.deliverables?.length || data.fileTypes?.length || data.usageRights?.length || data.socialPlatforms?.length) && (
                     <div>
-                        <h3 className="text-lg font-semibold text-gray-800">Deliverables & Usage</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-2">Deliverables & Usage</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-700">
                             {data.deliverables?.length ? <div><span className="font-medium">Deliverables:</span> {data.deliverables.join(', ')}</div> : null}
                             {data.fileTypes?.length ? <div><span className="font-medium">File Types:</span> {data.fileTypes.join(', ')}</div> : null}
                             {data.usageRights?.length ? <div><span className="font-medium">Usage Rights:</span> {data.usageRights.join(', ')}</div> : null}
                             {data.socialPlatforms?.length ? <div><span className="font-medium">Social Platforms:</span> {data.socialPlatforms.join(', ')}</div> : null}
                         </div>
-                        {data.budgetEstimate && (
-                            <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-md">
-                              <h4 className="font-semibold text-gray-800 mb-2">Estimated Budget</h4>
-                              <div className="text-sm text-gray-700 space-y-1">
-                                {Object.entries(data.budgetEstimate.breakdown).map(([k,v]) => (
-                                  <div key={k} className="flex justify-between"><span>{k}</span><span>{new Intl.NumberFormat(undefined, { style: 'currency', currency: data.currency || 'USD' }).format(v)}</span></div>
-                                ))}
-                                <div className="flex justify-between font-bold pt-2 border-t"><span>Total</span><span>{new Intl.NumberFormat(undefined, { style: 'currency', currency: data.currency || 'USD' }).format(data.budgetEstimate.total)}</span></div>
-                              </div>
-                            </div>
-                        )}
                     </div>
+                )}
 
-                    {data.shotList?.length ? (
-                        <div>
-                          <h3 className="text-lg font-semibold text-gray-800 mb-2">Shot List</h3>
-                          <div className="space-y-2">
+                {data.shotList?.length ? (
+                    <div>
+                        <h3 className="text-lg font-semibold text-gray-800 mb-2">Shot List</h3>
+                        <div className="space-y-2">
                             {data.shotList.map((shot, i) => (
-                              <div key={shot.id} className="p-3 bg-gray-50 border border-gray-200 rounded-md">
-                                <div className="flex items-center justify-between">
-                                  <p className="font-semibold text-gray-800">Shot #{i + 1}</p>
-                                  {shot.priority && <span className="ml-2 text-xs font-bold text-indigo-600 bg-indigo-100 px-2 py-1 rounded-full">MUST-HAVE</span>}
+                                <div key={shot.id} className="p-3 bg-gray-50 border border-gray-200 rounded-md">
+                                    <div className="flex items-center justify-between">
+                                        <p className="font-semibold text-gray-800">Shot #{i + 1}</p>
+                                        {shot.priority && <span className="ml-2 text-xs font-bold text-indigo-600 bg-indigo-100 px-2 py-1 rounded-full">MUST-HAVE</span>}
+                                    </div>
+                                    <p className="mt-1 text-sm text-gray-700">{shot.description}</p>
+                                    <p className="text-xs text-gray-500">{shot.shotType} | {shot.angle} {shot.notes && `| ${shot.notes}`}</p>
                                 </div>
-                                <p className="mt-1 text-sm text-gray-700">{shot.description}</p>
-                                <p className="text-xs text-gray-500">{shot.shotType} | {shot.angle} {shot.notes && `| ${shot.notes}`}</p>
-                              </div>
                             ))}
-                          </div>
                         </div>
-                      ) : null}
-
-                      {data.crew?.length ? (
-                        <div>
-                          <h3 className="text-lg font-semibold text-gray-800 mb-2">Crew & Talent</h3>
-                          <div className="space-y-2">
-                            {data.crew.map(member => (
-                              <div key={member.id} className="p-3 bg-gray-50 border border-gray-200 rounded-md">
-                                <p className="font-semibold text-gray-800">{member.name || 'No Name'} <span className="font-normal text-gray-600">— {member.role || 'No Role'}</span></p>
-                                <p className="text-sm text-gray-600">Call: {member.callTime || 'TBD'} | Contact: {member.contact || 'N/A'}</p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ) : null}
-
-                      {(data.schedule || data.emergencyContact || data.nearestHospital || data.notes) && (
-                        <div>
-                          <h3 className="text-lg font-semibold text-gray-800 mb-2">Logistics</h3>
-                          {data.schedule && <p className="text-sm text-gray-700"><span className="font-medium">Schedule:</span> {data.schedule}</p>}
-                          {data.emergencyContact && <p className="text-sm text-gray-700"><span className="font-medium">Emergency Contact:</span> {data.emergencyContact}</p>}
-                          {data.nearestHospital && <p className="text-sm text-gray-700"><span className="font-medium">Nearest Hospital:</span> {data.nearestHospital}</p>}
-                          {data.notes && <p className="text-sm text-gray-700"><span className="font-medium">Notes:</span> {data.notes}</p>}
-                        </div>
-                      )}
                     </div>
-                </div>
-                
-                {/* Action buttons */}
-                <div className="flex flex-col md:flex-row md:justify-between md:items-center mt-6 gap-4">
-                    <button onClick={handleShare} className="w-full md:w-auto px-4 py-2 bg-gray-100 text-gray-800 font-semibold rounded-md hover:bg-gray-200 transition-colors">Share Link</button>
-                    <button onClick={handleDownloadPdf} className="w-full md:w-auto px-4 py-2 bg-gray-100 text-gray-800 font-semibold rounded-md hover:bg-gray-200 transition-colors">Download PDF</button>
-                    <button onClick={() => setEmailModalOpen(true)} className="w-full md:w-auto px-4 py-2 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 transition-colors shadow-sm">Email Brief</button>
-                </div>
+                ) : null}
+
+                {(data.schedule || data.emergencyContact || data.nearestHospital || data.notes) && (
+                    <div>
+                        <h3 className="text-lg font-semibold text-gray-800 mb-2">Logistics</h3>
+                        {data.schedule && <p className="text-sm text-gray-700"><span className="font-medium">Schedule:</span> {data.schedule}</p>}
+                        {data.emergencyContact && <p className="text-sm text-gray-700"><span className="font-medium">Emergency Contact:</span> {data.emergencyContact}</p>}
+                        {data.nearestHospital && <p className="text-sm text-gray-700"><span className="font-medium">Nearest Hospital:</span> {data.nearestHospital}</p>}
+                        {data.notes && <p className="text-sm text-gray-700"><span className="font-medium">Notes:</span> {data.notes}</p>}
+                    </div>
+                )}
             </div>
 
-            {/* Email Modal */}
-            {isEmailModalOpen && (
-                <Modal isOpen={isEmailModalOpen} onClose={() => setEmailModalOpen(false)} title="Send Brief via Email">
-                    <div className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Recipients</label>
-                            <input
-                                type="text"
-                                value={additionalRecipients}
-                                onChange={(e) => setAdditionalRecipients(e.target.value)}
-                                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                                placeholder="Enter email addresses, separated by commas"
-                            />
-                            <div className="flex items-center mt-2">
-                                <input
-                                    id="send-to-self"
-                                    type="checkbox"
-                                    checked={includeSelf}
-                                    onChange={(e) => setIncludeSelf(e.target.checked)}
-                                    className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                                />
-                                <label htmlFor="send-to-self" className="ml-2 block text-sm text-gray-900">
-                                    Send a copy to my email ({data.clientEmail})
-                                </label>
-                            </div>
-                        </div>
-                        <div className="flex justify-end gap-3">
-                            <button onClick={() => setEmailModalOpen(false)} className="px-4 py-2 bg-gray-200 text-gray-700 font-semibold rounded-md hover:bg-gray-300 transition-colors">
-                                Cancel
-                            </button>
-                            <button onClick={handleSendEmail} disabled={isSending} className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
-                                {isSending ? 'Sending...' : 'Send Email'}
-                            </button>
-                        </div>
-                    </div>
-                </Modal>
-            )}
+            <div className="flex flex-col md:flex-row md:justify-between md:items-center mt-6 gap-4">
+                <button onClick={handleShare} className="w-full md:w-auto px-4 py-2 bg-gray-100 text-gray-800 font-semibold rounded-md hover:bg-gray-200 transition-colors">Share Link</button>
+                <button onClick={handleDownloadPdf} className="w-full md:w-auto px-4 py-2 bg-gray-100 text-gray-800 font-semibold rounded-md hover:bg-gray-200 transition-colors">Download PDF</button>
+                <button onClick={() => setEmailModalOpen(true)} className="w-full md:w-auto px-4 py-2 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 transition-colors shadow-sm">Email Brief</button>
+            </div>
 
-            {/* Share Modal */}
-            {isShareModalOpen && (
-                <Modal isOpen={isShareModalOpen} onClose={() => setShareModalOpen(false)} title="Share Your Brief">
-                    <div className="space-y-4">
-                        <p className="text-gray-700 text-sm">
-                            Share this link with anyone you want to collaborate with. They will be able to view and edit the brief.
-                        </p>
-                        <div className="relative">
-                            <input
-                                type="text"
-                                value={shareLink}
-                                readOnly
-                                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                            />
-                            <button
-                                onClick={copyToClipboard}
-                                className="absolute right-2 top-2 px-3 py-1.5 bg-indigo-600 text-white text-sm font-semibold rounded-md hover:bg-indigo-700 transition-colors"
-                            >
-                                Copy Link
-                            </button>
-                        </div>
-                        <div className="flex justify-end">
-                            <button onClick={() => setShareModalOpen(false)} className="px-4 py-2 bg-gray-200 text-gray-700 font-semibold rounded-md hover:bg-gray-300 transition-colors">
-                                Close
-                            </button>
+            <Modal isOpen={isEmailModalOpen} onClose={() => setEmailModalOpen(false)} title="Send Brief via Email">
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Recipients</label>
+                        <input type="text" value={additionalRecipients} onChange={(e) => setAdditionalRecipients(e.target.value)} className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Enter email addresses, separated by commas" />
+                        <div className="flex items-center mt-2">
+                            <input id="send-to-self" type="checkbox" checked={includeSelf} onChange={(e) => setIncludeSelf(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+                            <label htmlFor="send-to-self" className="ml-2 block text-sm text-gray-900">Send a copy to my email ({data.clientEmail || 'none'})</label>
                         </div>
                     </div>
-                </Modal>
-            )}
-        </>
+                    <div className="flex justify-end gap-3">
+                        <button onClick={() => setEmailModalOpen(false)} className="px-4 py-2 bg-gray-200 text-gray-700 font-semibold rounded-md hover:bg-gray-300 transition-colors">Cancel</button>
+                        <button onClick={handleSendEmail} disabled={isSending} className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">{isSending ? 'Sending...' : 'Send Email'}</button>
+                    </div>
+                </div>
+            </Modal>
+
+            <Modal isOpen={isShareModalOpen} onClose={() => setShareModalOpen(false)} title="Share Your Brief">
+                               <div className="space-y-4">
+                    <p className="text-gray-700 text-sm">Share this link with anyone you want to collaborate with. They will be able to view the brief.</p>
+                    <div className="relative">
+                        <input ref={shareLinkRef} type="text" value={shareLink} readOnly className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                        <button onClick={copyToClipboard} className="absolute right-2 top-2 px-3 py-1.5 bg-indigo-600 text-white text-sm font-semibold rounded-md hover:bg-indigo-700 transition-colors">Copy Link</button>
+                    </div>
+                    <div className="flex justify-end">
+                        <button onClick={() => setShareModalOpen(false)} className="px-4 py-2 bg-gray-200 text-gray-700 font-semibold rounded-md hover:bg-gray-300 transition-colors">Close</button>
+                    </div>
+                </div>
+            </Modal>
+        </div>
     );
 };
 
