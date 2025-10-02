@@ -34,3 +34,13 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Environment variables
+
+This project requires a few server-side environment variables for the API routes to work:
+
+- `GEMINI_API_KEY` — API key for the Gemini / Google Generative API (used by `/api/gemini`).
+- `RESEND_API_KEY` — API key for Resend (used by `/api/email`).
+- `RESEND_FROM` — Verified sender email address for Resend.
+
+Create a `.env` in the project root (do not commit it) or set these in your deployment platform. See `.env.example` for an example.

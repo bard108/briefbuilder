@@ -10,7 +10,8 @@ const { chromium } = require('playwright');
   page.on('dialog', async dialog => { console.log('DIALOG:', dialog.message()); await dialog.dismiss(); });
   page.on('requestfailed', req => console.log('REQ FAILED:', req.url(), req.failure()?.errorText));
 
-  await page.goto('http://localhost:3000', { waitUntil: 'networkidle' });
+  const port = process.env.PORT || 3000;
+  await page.goto(`http://localhost:${port}`, { waitUntil: 'networkidle' });
   await page.click('text="I\'m a Client"');
   await page.fill('#projectName', 'Playwright Debug Project');
 

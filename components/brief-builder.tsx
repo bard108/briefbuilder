@@ -85,6 +85,86 @@ declare global {
     }
 }
 
+// --- Color conversion utilities (OKLCH -> sRGB hex) ---
+// Lightweight implementation adapted for client-side inlining. This handles common
+// CSS representations like `oklch(61.2% 0.05 261)` or `oklch(0.612 0.05 261deg)`.
+const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+
+function oklabToLinearSrgb(L: number, a: number, b: number) {
+    // convert Oklab -> LMS
+    const l = L + 0.3963377774 * a + 0.2158037573 * b;
+    const m = L - 0.1055613458 * a - 0.0638541728 * b;
+    const s = L - 0.0894841775 * a - 1.2914855480 * b;
+
+    const l3 = l * l * l;
+    const m3 = m * m * m;
+    const s3 = s * s * s;
+
+    const r = +4.0767416621 * l3 - 3.3077115913 * m3 + 0.2309699292 * s3;
+    const g = -1.2684380046 * l3 + 2.6097574011 * m3 - 0.3413193965 * s3;
+    const b_ = -0.0041960863 * l3 - 0.7034186147 * m3 + 1.7076147010 * s3;
+    return [r, g, b_];
+}
+
+function linearToSrgbChannel(c: number) {
+    // clamp small negative values to zero
+    c = Math.max(0, c);
+    if (c <= 0.0031308) return 12.92 * c;
+    return 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+}
+
+function rgbToHex(r: number, g: number, b: number) {
+    const to255 = (v: number) => Math.round(clamp(v) * 255);
+    return '#' + [r, g, b].map(x => to255(x).toString(16).padStart(2, '0')).join('');
+}
+
+function parseOklchString(input: string) {
+    try {
+        const m = input.match(/oklch\(([^)]+)\)/i);
+        if (!m) return null;
+    const inner = m[1].trim();
+    // Normalize separators: replace commas and slashes with spaces, then split by whitespace
+    const normalized = inner.replace(/,/g, ' ').replace(/\//g, ' ');
+    const tokens = normalized.split(/\s+/).map(t => t.trim()).filter(Boolean);
+    // tokens should be [L, C, h, (alpha?)]
+    const Ltok = tokens[0];
+    const Ctok = tokens[1];
+    const htok = tokens[2];
+
+        if (!Ltok || !Ctok || !htok) return null;
+
+        let L = 0; // 0..1
+        if (Ltok.endsWith('%')) L = parseFloat(Ltok) / 100;
+        else {
+            const f = parseFloat(Ltok);
+            L = f > 1 ? f / 100 : f;
+        }
+
+        const C = parseFloat(Ctok);
+
+        let h = htok.replace(/deg$/, '').trim();
+        let hVal = parseFloat(h);
+        if (isNaN(hVal)) return null;
+        const hr = (hVal * Math.PI) / 180;
+        return { L, C, h: hr };
+    } catch (e) {
+        return null;
+    }
+}
+
+function oklchStringToHex(input: string) {
+    const parsed = parseOklchString(input);
+    if (!parsed) return null;
+    const { L, C, h } = parsed;
+    const a = Math.cos(h) * C;
+    const b = Math.sin(h) * C;
+    const [lr, lg, lb] = oklabToLinearSrgb(L, a, b);
+    const r = linearToSrgbChannel(lr);
+    const g = linearToSrgbChannel(lg);
+    const b_ = linearToSrgbChannel(lb);
+    return rgbToHex(r, g, b_);
+}
+
 
 // --- SVG ICONS ---
 // Using inline SVGs to keep everything in a single file.
@@ -850,6 +930,10 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
 
                 try { document.body.removeChild(safeSnapshot); } catch (_) {}
             }
+            if (!canvas) {
+                throw new Error('Failed to render canvas for PDF generation');
+            }
+
             const imgData = canvas.toDataURL('image/png');
 
             // jsPDF may be exported as a class under jsPDF or as a namespace with jsPDF member

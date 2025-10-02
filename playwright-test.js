@@ -6,7 +6,8 @@ const fs = require('fs');
   const context = await browser.newContext({ acceptDownloads: true });
   const page = await context.newPage();
 
-  await page.goto('http://localhost:3000', { waitUntil: 'networkidle' });
+  const port = process.env.PORT || 3000;
+  await page.goto(`http://localhost:${port}`, { waitUntil: 'networkidle' });
 
   // Click "I'm a Client" button
   await page.click('text="I\'m a Client"');
