@@ -1085,8 +1085,28 @@ export default function BriefBuilder() {
         setFormData(prev => ({ ...prev, [key]: value }));
     };
 
+    const buildStepsForRole = (role: string): Step[] => {
+        const base: Step[] = [
+            { id: 'client-info', title: 'Your Information', icon: <UserIcon /> },
+            { id: 'details', title: 'Project Details', icon: <BriefcaseIcon /> },
+            { id: 'moodboard', title: 'Mood Board', icon: <ImageIcon /> },
+            { id: 'deliverables', title: 'Deliverables', icon: <CameraIcon /> },
+            { id: 'shotlist', title: 'Shot List', icon: <ListIcon /> },
+        ];
+        const review: Step = { id: 'review', title: 'Review & Distribute', icon: <CheckCircleIcon /> };
+        if (role === 'Client') {
+            return [base[0], base[1], base[2], { id: 'contact', title: 'Contact Info', icon: <MailIcon /> }, base[3], base[4], review];
+        }
+        if (role === 'Photographer') {
+            return [base[0], base[1], base[2], { id: 'location', title: 'Date & Location', icon: <MapPinIcon /> }, base[3], base[4], { id: 'callsheet', title: 'Crew & Talent', icon: <UsersIcon /> }, review];
+        }
+        // Producer (default)
+        return [base[0], base[1], base[2], { id: 'location', title: 'Date & Location', icon: <MapPinIcon /> }, base[3], base[4], { id: 'callsheet', title: 'Call Sheet & Logistics', icon: <UsersIcon /> }, review];
+    };
+
     const handleRoleSelect = (role: string) => {
         updateFormData('userRole', role);
+        setSteps(buildStepsForRole(role));
         setWizardStarted(true);
         setStep(1);
     };
@@ -1094,49 +1114,9 @@ export default function BriefBuilder() {
     useEffect(() => {
         const role = formData.userRole;
         if (!role) return;
-
-        const baseSteps: Step[] = [
-            { id: 'client-info', title: 'Your Information', icon: <UserIcon /> },
-            { id: 'details', title: 'Project Details', icon: <BriefcaseIcon /> },
-            { id: 'moodboard', title: 'Mood Board', icon: <ImageIcon /> },
-            { id: 'deliverables', title: 'Deliverables', icon: <CameraIcon /> },
-            { id: 'shotlist', title: 'Shot List', icon: <ListIcon /> },
-        ];
-
-        const reviewStep: Step = { id: 'review', title: 'Review & Distribute', icon: <CheckCircleIcon /> };
-
-        if (role === 'Client') {
-            setSteps([
-                baseSteps[0], // Client Info
-                baseSteps[1], // Details
-                baseSteps[2], // Moodboard
-                { id: 'contact', title: 'Contact Info', icon: <MailIcon /> },
-                baseSteps[3], // Deliverables
-                baseSteps[4], // Shot List
-                reviewStep
-            ]);
-        } else if (role === 'Photographer') {
-            setSteps([
-                baseSteps[0], // Client Info
-                baseSteps[1], // Details
-                baseSteps[2], // Moodboard
-                { id: 'location', title: 'Date & Location', icon: <MapPinIcon />},
-                baseSteps[3], // Deliverables
-                baseSteps[4], // Shot List
-                { id: 'callsheet', title: 'Crew & Talent', icon: <UsersIcon /> },
-                reviewStep
-            ]);
-        } else if (role === 'Producer') {
-            setSteps([
-                baseSteps[0], // Client Info
-                baseSteps[1], // Details
-                baseSteps[2], // Moodboard
-                { id: 'location', title: 'Date & Location', icon: <MapPinIcon />},
-                baseSteps[3], // Deliverables
-                baseSteps[4], // Shot List
-                { id: 'callsheet', title: 'Call Sheet & Logistics', icon: <UsersIcon /> },
-                reviewStep
-            ]);
+        // Keep steps in sync if role changes, or if steps were empty
+        if (!steps.length || steps[0]?.id !== 'client-info') {
+            setSteps(buildStepsForRole(role));
         }
     }, [formData.userRole]);
     
@@ -1190,6 +1170,30 @@ export default function BriefBuilder() {
                     <h1 className="text-2xl font-bold text-gray-900 mb-2">
                         {formData.userRole === 'Client' ? 'Project Inquiry' : 'Photography Brief'}
                     </h1>
+                    <p className="text-gray-600 mb-8">Created by <span className="font-semibold">{formData.clientName || formData.userRole}</span></p>
+                    <nav>
+                        <ul className="space-y-4">
+                            {steps.map((s, index) => (
+                                <li key={s.id}>
+                                    <button onClick={() => goToStep(index + 1)} className={`w-full flex items-center text-left p-3 rounded-lg transition-colors duration-200 ${step === (index + 1) ? 'bg-indigo-100 text-indigo-700' : 'text-gray-800 hover:bg-gray-200'}`}>
+                                        <div className={`flex items-center justify-center h-10 w-10 rounded-full border-2 ${step >= (index + 1) ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-300 text-gray-700'}`}>
+                                            {step > (index + 1) ? '✔' : (index + 1)}
+                                        </div>
+                                        <span className="ml-4 font-medium">{s.title}</span>
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    </nav>
+                </div>
+
+                {/* Main Content */}
+                <div className="md:w-2/3 p-8 md:p-12 overflow-y-auto" style={{maxHeight: '90vh'}}>
+                    <div className="animate-fade-in">
+                        {steps.length > 0 ? renderStep() : <div>Loading...</div>}
+                    </div>
+                    
+                    {/* Navigation */}
                     {!isFinalStep && (
                         <div className="mt-12 pt-6 border-t border-gray-200 flex justify-between items-center">
                             <div>
