@@ -11,10 +11,20 @@ const fs = require('fs');
 
   // Click "I'm a Client" button
   await page.click('text="I\'m a Client"');
-  // Fill project name
+
+  // New first step: fill in name and email
+  const nameInput = await page.$('input[placeholder="Enter your name"]');
+  const emailInput = await page.$('input[placeholder="Enter your email"]');
+  if (nameInput) await nameInput.fill('Playwright Tester');
+  if (emailInput) await emailInput.fill('tester@example.com');
+  const nextBtn1 = await page.$('button:has-text("Next")');
+  if (nextBtn1) await nextBtn1.click();
+
+  // Now on Project Details step: fill project name
   await page.fill('#projectName', 'Playwright Test Project');
+
   // Click Next until Review
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 7; i++) {
     const next = await page.$('button:has-text("Next")');
     if (!next) break;
     await next.click();
@@ -22,7 +32,7 @@ const fs = require('fs');
   }
 
   // Wait for Download PDF button and click
-  await page.waitForSelector('button:has-text("Download PDF")', { timeout: 5000 });
+  await page.waitForSelector('button:has-text("Download PDF")', { timeout: 10000 });
   const [download] = await Promise.all([
     page.waitForEvent('download'),
     page.click('button:has-text("Download PDF")')

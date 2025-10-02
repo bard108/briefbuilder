@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 
+import { ClientInfoStep } from './client-info-step';
+
 // --- Type Definitions ---
 interface Shot {
   id: number;
@@ -47,6 +49,14 @@ interface FormData {
   emergencyContact?: string;
   nearestHospital?: string;
   notes?: string;
+  // New fields
+  stepMeta?: Record<string, { owner?: string; dueDate?: string; status?: 'Not Started' | 'In Progress' | 'Complete' }>;
+  currency?: 'USD' | 'EUR' | 'GBP';
+  budgetEstimate?: { total: number; breakdown: Record<string, number> };
+  locationInsights?: { lat?: number; lon?: number; address?: string; sunrise?: string; sunset?: string; weatherSummary?: string };
+  equipmentChecklist?: Array<{ id: string; label: string; checked: boolean }>;
+  rentalsChecklist?: string[];
+  packingList?: string[];
 }
 
 interface Step {
@@ -234,14 +244,20 @@ const SparklesIcon = ({ className }: { className: string }) => (
         <path d="M21 12L19.1 16.2L14.9 18.1L19.1 20L21 24L19.1 19.8L14.9 17.9L19.1 16L21 12Z"></path>
     </svg>
 );
+const UserIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-gray-500">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+        <circle cx="12" cy="7" r="4"></circle>
+    </svg>
+);
 
 // --- API HELPER ---
-async function callGeminiAPI(prompt: string, jsonSchema: Record<string, unknown> | null = null) {
+async function callGeminiAPI(prompt: string, jsonSchema: Record<string, unknown> | null = null, images?: string[]) {
     try {
         const resp = await fetch('/api/gemini', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt, jsonSchema }),
+            body: JSON.stringify({ prompt, jsonSchema, images: images || [] }),
         });
 
         if (!resp.ok) {
@@ -445,18 +461,64 @@ const MoodboardStep = ({ data, updateData }: StepProps) => {
         updateData('moodboardFiles', files.filter((_, index) => index !== indexToRemove));
     };
 
+    const fileToDataUrl = (f: File) => new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = reject;
+        reader.readAsDataURL(f);
+    });
+
+    const generateFromImages = async () => {
+        if (!files.length) {
+            alert('Upload 1-6 reference images first.');
+            return;
+        }
+        const maxUse = files.slice(0, 6); // limit to keep payload small
+        const dataUrls = await Promise.all(maxUse.map(fileToDataUrl));
+        const prompt = `You are an expert photo art director. Based on the uploaded reference images and this brief context:\n` +
+            `Project: ${data.projectName || 'Untitled'}\nOverview: ${data.overview || 'N/A'}\nObjectives: ${data.objectives || 'N/A'}\n` +
+            `Generate a concise list of 5-7 shot ideas as JSON array with fields: description, shotType (Wide|Medium|Close-up|Detail|Overhead), angle (Eye-level|High Angle|Low Angle), notes.`;
+        const shotListSchema = {
+            type: 'ARRAY',
+            items: {
+                type: 'OBJECT',
+                properties: {
+                    description: { type: 'STRING' },
+                    shotType: { type: 'STRING' },
+                    angle: { type: 'STRING' },
+                    notes: { type: 'STRING' },
+                },
+                required: ['description', 'shotType', 'angle', 'notes']
+            }
+        };
+        const result = await callGeminiAPI(prompt, shotListSchema, dataUrls);
+        if (result) {
+            try {
+                const newShotsData = JSON.parse(result) as Omit<Shot, 'id' | 'priority'>[];
+                const newShots = newShotsData.map((shot) => ({ ...shot, id: Date.now() + Math.random(), priority: false }));
+                updateData('shotList', [...(data.shotList || []), ...newShots]);
+            } catch (e) {
+                console.error('Failed to parse vision shot list JSON:', e);
+                alert('AI returned an invalid response. Please try again.');
+            }
+        }
+    };
+
     return (
         <div className="space-y-8">
             <h2 className="text-2xl font-bold text-gray-800">Creative Direction & Mood Board</h2>
             <p className="text-gray-600">Provide a link to a mood board or upload reference images to help communicate the desired look and feel.</p>
             
-            <Input 
+            <div className="flex items-center gap-3">
+              <Input 
                 label="Mood Board Link (Optional)" 
                 id="moodboardLink" 
                 placeholder="e.g., https://pinterest.com/your-board" 
                 value={data.moodboardLink || ''} 
                 onChange={(e) => updateData('moodboardLink', e.target.value)} 
-            />
+              />
+              <button onClick={generateFromImages} className="self-end h-10 px-3 py-2 border border-indigo-600 text-indigo-600 text-sm font-semibold rounded-md hover:bg-indigo-50">✨ Generate Shots from Images</button>
+            </div>
 
             <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Upload Reference Images (Optional)</label>
@@ -525,6 +587,46 @@ const DeliverablesStep = ({ data, updateData }: StepProps) => {
         updateData(group, newSelection);
     };
 
+    const currency = data.currency || 'USD';
+    const fx = (v: number) => {
+        const f = new Intl.NumberFormat(undefined, { style: 'currency', currency }).format;
+        return f(v);
+    };
+
+    const estimateBudget = () => {
+        const base: Record<string, number> = {
+            photography: 1500,
+            video: 2200,
+            socialAssets: 600,
+            other: 400,
+        };
+        const usageMul: Record<string, number> = {
+            print: 1.2, website: 1.1, social: 1.1, advertising: 1.6, internal: 1.0, other: 1.0
+        };
+        const crew = (data.crew || []).length;
+        const deliverables = data.deliverables || [];
+        const rights = data.usageRights || [];
+
+        const breakdown: Record<string, number> = {};
+        let total = 0;
+        deliverables.forEach(d => {
+            const subtotal = base[d] || 0;
+            breakdown[`Deliverable: ${d}`] = subtotal;
+            total += subtotal;
+        });
+        const rightsMul = rights.reduce((acc, r) => acc * (usageMul[r] || 1.0), 1.0);
+        if (rightsMul !== 1.0) {
+            breakdown['Usage multiplier'] = parseFloat((total * (rightsMul - 1)).toFixed(2));
+            total = parseFloat((total * rightsMul).toFixed(2));
+        }
+        if (crew > 0) {
+            const crewCost = crew * 250; // simple heuristic
+            breakdown['Crew'] = crewCost;
+            total += crewCost;
+        }
+        updateData('budgetEstimate', { total, breakdown });
+    };
+
     return (
         <div className="space-y-8">
             <h2 className="text-2xl font-bold text-gray-800">Deliverables & Usage</h2>
@@ -532,7 +634,50 @@ const DeliverablesStep = ({ data, updateData }: StepProps) => {
                 {data.userRole === 'Client' ? "Let us know what you need. Don't worry if you're unsure about the technical details." : "Select the required deliverables and specify technical requirements."}
             </p>
             
-            <CheckboxGroup legend="Which deliverables are required?" options={deliverableOptions} selectedOptions={data.deliverables || []} onChange={(id) => handleCheckboxChange('deliverables', id)} />
+            <div className="flex items-end gap-3">
+              <CheckboxGroup legend="Which deliverables are required?" options={deliverableOptions} selectedOptions={data.deliverables || []} onChange={(id) => handleCheckboxChange('deliverables', id)} />
+
+              {/* Budget Estimator */}
+              <div className="p-4 bg-white border rounded-md">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-md font-semibold text-gray-800">Budget Estimator</h3>
+                    <div>
+                      <label className="block text-xs text-gray-600">Currency</label>
+                      <select value={data.currency || 'USD'} onChange={(e) => updateData('currency', e.target.value as any)} className="px-2 py-1 border rounded">
+                        <option value="USD">USD</option>
+                        <option value="EUR">EUR</option>
+                        <option value="GBP">GBP</option>
+                      </select>
+                    </div>
+                  </div>
+                  <button onClick={() => {
+                    const base: Record<string, number> = { photography: 1500, video: 2200, socialAssets: 600, other: 400 };
+                    const usageMul: Record<string, number> = { print: 1.2, website: 1.1, social: 1.1, advertising: 1.6, internal: 1.0, other: 1.0 };
+                    const crew = (data.crew || []).length;
+                    const deliverables = data.deliverables || [];
+                    const rights = data.usageRights || [];
+                    const breakdown: Record<string, number> = {};
+                    let total = 0;
+                    deliverables.forEach(d => { const sub = base[d] || 0; breakdown[`Deliverable: ${d}`] = sub; total += sub; });
+                    const mul = rights.reduce((acc, r) => acc * (usageMul[r] || 1.0), 1.0);
+                    if (mul !== 1.0) { breakdown['Usage multiplier'] = parseFloat((total * (mul - 1)).toFixed(2)); total = parseFloat((total * mul).toFixed(2)); }
+                    if (crew > 0) { const c = crew * 250; breakdown['Crew'] = c; total += c; }
+                    updateData('budgetEstimate', { total, breakdown });
+                  }} className="px-3 py-1.5 border border-indigo-600 text-indigo-600 text-sm font-semibold rounded-md hover:bg-indigo-50">Estimate</button>
+                </div>
+                {data.budgetEstimate ? (
+                  <div className="text-sm text-gray-700 space-y-1">
+                    {Object.entries(data.budgetEstimate.breakdown).map(([k,v]) => (
+                      <div key={k} className="flex justify-between"><span>{k}</span><span>{new Intl.NumberFormat(undefined, { style: 'currency', currency: data.currency || 'USD' }).format(v)}</span></div>
+                    ))}
+                    <div className="flex justify-between font-bold pt-2 border-t"><span>Total</span><span>{new Intl.NumberFormat(undefined, { style: 'currency', currency: data.currency || 'USD' }).format(data.budgetEstimate.total)}</span></div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">Select deliverables, usage rights, and crew, then click Estimate.</p>
+                )}
+              </div>
+            </div>
 
             {data.deliverables?.includes('photography') && (
                 <div className="space-y-8 p-6 bg-gray-50 rounded-lg border border-gray-200 animate-fade-in">
@@ -550,6 +695,46 @@ const DeliverablesStep = ({ data, updateData }: StepProps) => {
                     <CheckboxGroup legend="Required Social Platforms / Aspect Ratios" options={socialPlatformOptions} selectedOptions={data.socialPlatforms || []} onChange={(id) => handleCheckboxChange('socialPlatforms', id)} />
                 </div>
             )}
+
+            <div className="p-4 bg-white border rounded-md">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <h3 className="text-md font-semibold text-gray-800">Budget Estimator</h3>
+                  <div>
+                    <label className="block text-xs text-gray-600">Currency</label>
+                    <select value={data.currency || 'USD'} onChange={(e) => updateData('currency', e.target.value as any)} className="px-2 py-1 border rounded">
+                      <option value="USD">USD</option>
+                      <option value="EUR">EUR</option>
+                      <option value="GBP">GBP</option>
+                    </select>
+                  </div>
+                </div>
+                <button onClick={() => {
+                  const base: Record<string, number> = { photography: 1500, video: 2200, socialAssets: 600, other: 400 };
+                  const usageMul: Record<string, number> = { print: 1.2, website: 1.1, social: 1.1, advertising: 1.6, internal: 1.0, other: 1.0 };
+                  const crew = (data.crew || []).length;
+                  const deliverables = data.deliverables || [];
+                  const rights = data.usageRights || [];
+                  const breakdown: Record<string, number> = {};
+                  let total = 0;
+                  deliverables.forEach(d => { const sub = base[d] || 0; breakdown[`Deliverable: ${d}`] = sub; total += sub; });
+                  const mul = rights.reduce((acc, r) => acc * (usageMul[r] || 1.0), 1.0);
+                  if (mul !== 1.0) { breakdown['Usage multiplier'] = parseFloat((total * (mul - 1)).toFixed(2)); total = parseFloat((total * mul).toFixed(2)); }
+                  if (crew > 0) { const c = crew * 250; breakdown['Crew'] = c; total += c; }
+                  updateData('budgetEstimate', { total, breakdown });
+                }} className="px-3 py-1.5 border border-indigo-600 text-indigo-600 text-sm font-semibold rounded-md hover:bg-indigo-50">Estimate</button>
+              </div>
+              {data.budgetEstimate ? (
+                <div className="text-sm text-gray-700 space-y-1">
+                  {Object.entries(data.budgetEstimate.breakdown).map(([k,v]) => (
+                    <div key={k} className="flex justify-between"><span>{k}</span><span>{new Intl.NumberFormat(undefined, { style: 'currency', currency: data.currency || 'USD' }).format(v)}</span></div>
+                  ))}
+                  <div className="flex justify-between font-bold pt-2 border-t"><span>Total</span><span>{new Intl.NumberFormat(undefined, { style: 'currency', currency: data.currency || 'USD' }).format(data.budgetEstimate.total)}</span></div>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">Select deliverables, usage rights, and crew, then click Estimate.</p>
+              )}
+            </div>
         </div>
     );
 };
@@ -736,7 +921,8 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
     const [isEmailModalOpen, setEmailModalOpen] = useState(false);
     const [isShareModalOpen, setShareModalOpen] = useState(false);
     const [shareLink, setShareLink] = useState('');
-    const [emailRecipients, setEmailRecipients] = useState('');
+    const [includeSelf, setIncludeSelf] = useState<boolean>(!!data.clientEmail);
+    const [additionalRecipients, setAdditionalRecipients] = useState('');
     const [isSending, setIsSending] = useState(false);
     const briefContentRef = useRef(null);
     const shareLinkRef = useRef(null);
@@ -908,16 +1094,78 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
                 safeSnapshot.style.left = '-9999px';
                 safeSnapshot.style.top = '0';
                 safeSnapshot.style.width = (input.offsetWidth || 800) + 'px';
-                safeSnapshot.style.padding = '24px';
+                safeSnapshot.style.padding = '28px';
                 safeSnapshot.style.background = '#ffffff';
-                safeSnapshot.style.color = '#111827';
-                safeSnapshot.style.fontFamily = 'Arial, Helvetica, sans-serif';
-                safeSnapshot.style.fontSize = '12px';
-                safeSnapshot.style.lineHeight = '1.4';
+                safeSnapshot.style.color = '#0f172a';
+                safeSnapshot.style.fontFamily = 'Inter, Arial, Helvetica, sans-serif';
+                safeSnapshot.style.fontSize = '13px';
+                safeSnapshot.style.lineHeight = '1.45';
                 safeSnapshot.style.whiteSpace = 'pre-wrap';
 
-                // Use textContent to avoid carrying over any styles / variables
-                safeSnapshot.textContent = input.innerText || input.textContent || '';
+                // Build a cleaner HTML snapshot: header with title, creator and date, and a bordered content region
+                const title = document.createElement('div');
+                title.style.display = 'flex';
+                title.style.justifyContent = 'space-between';
+                title.style.alignItems = 'baseline';
+                title.style.marginBottom = '18px';
+
+                const h = document.createElement('h1');
+                h.textContent = data.projectName || 'Untitled Brief';
+                h.style.fontSize = '20px';
+                h.style.margin = '0';
+                h.style.fontWeight = '700';
+                h.style.color = '#0b1220';
+
+                const meta = document.createElement('div');
+                meta.style.fontSize = '12px';
+                meta.style.color = '#475569';
+                const creator = data.clientName || (data.userRole ? `${data.userRole}` : 'Unknown');
+                const created = new Date().toLocaleString();
+                meta.textContent = `Created by ${creator} • ${created}`;
+
+                title.appendChild(h);
+                title.appendChild(meta);
+
+                const contentBox = document.createElement('div');
+                contentBox.style.border = '1px solid #e6edf3';
+                contentBox.style.padding = '16px';
+                contentBox.style.borderRadius = '6px';
+                contentBox.style.background = '#ffffff';
+                contentBox.style.color = '#0b1220';
+
+                // Build content using the input's sections but simplified
+                const sections = input.querySelectorAll(':scope > div') as NodeListOf<HTMLElement>;
+                if (sections.length > 0) {
+                    sections.forEach((sec: HTMLElement) => {
+                        const secTitleEl = sec.querySelector('h3, h2, h1');
+                        const secTitle = secTitleEl ? secTitleEl.textContent : '';
+                        const text = (sec.innerText || sec.textContent || '');
+                        const sdiv = document.createElement('div');
+                        sdiv.style.marginBottom = '12px';
+                        if (secTitle) {
+                            const tlh = document.createElement('div');
+                            tlh.textContent = secTitle;
+                            tlh.style.fontWeight = '600';
+                            tlh.style.marginBottom = '6px';
+                            tlh.style.color = '#0b1220';
+                            sdiv.appendChild(tlh);
+                        }
+                        const p = document.createElement('div');
+                        p.textContent = text.replace(/\n\s*\n/g, '\n');
+                        p.style.whiteSpace = 'pre-wrap';
+                        p.style.color = '#0b1220';
+                        sdiv.appendChild(p);
+                        contentBox.appendChild(sdiv);
+                    });
+                } else {
+                    const p = document.createElement('div');
+                    p.textContent = input.innerText || input.textContent || '';
+                    p.style.whiteSpace = 'pre-wrap';
+                    contentBox.appendChild(p);
+                }
+
+                safeSnapshot.appendChild(title);
+                safeSnapshot.appendChild(contentBox);
                 document.body.appendChild(safeSnapshot);
 
                 try {
@@ -964,7 +1212,7 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
     };
 
     const handleShare = () => {
-        // In a real app, this would involve saving the data and generating a unique token.
+        // In a real app, this would involve saving the data and generating a unique
         const mockToken = Math.random().toString(36).substring(2, 10);
         const link = `${window.location.origin}/share/${mockToken}`;
         setShareLink(link);
@@ -982,8 +1230,15 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
     };
     
     const handleSendEmail = () => {
-        if (!emailRecipients) {
-            alert("Please enter at least one recipient email.");
+        const rawSelf = includeSelf && data.clientEmail ? [data.clientEmail] : [];
+        const others = additionalRecipients
+            .split(',')
+            .map(s => s.trim())
+            .filter(Boolean);
+        const recipients = Array.from(new Set([...rawSelf, ...others]));
+
+        if (recipients.length === 0) {
+            alert('Please select "Send to my email" or add at least one recipient.');
             return;
         }
         setIsSending(true);
@@ -992,7 +1247,6 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
             try {
                 // Prepare basic HTML summary from the brief content
                 const htmlContent = document.getElementById('brief-content-for-pdf')?.outerHTML || JSON.stringify(data, null, 2);
-                const recipients = emailRecipients.split(',').map(s => s.trim()).filter(Boolean);
 
                 const resp = await fetch('/api/email', {
                     method: 'POST',
@@ -1007,7 +1261,7 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
                 } else {
                     alert('Email sent successfully');
                     setEmailModalOpen(false);
-                    setEmailRecipients('');
+                    setAdditionalRecipients('');
                 }
             } catch (err) {
                 console.error('Error sending email:', err);
@@ -1024,6 +1278,12 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
                 <h2 className="text-2xl font-bold text-gray-800">Review & Distribute</h2>
                 <p className="text-gray-600">Please review all the details below. Once you&apos;re happy, choose how you&apos;d like to share or save the document.</p>
                 <div id="brief-content-for-pdf" ref={briefContentRef} className="space-y-8 p-6 bg-white rounded-lg border border-gray-200">
+                    {/* PDF Header with project title and creator */}
+                    <div className="flex items-baseline justify-between mb-2">
+                        <h1 className="text-xl font-bold text-gray-900">{data.projectName || 'Untitled Brief'}</h1>
+                        <div className="text-xs text-gray-500">Created by {data.clientName || data.userRole || 'Unknown'} • {new Date().toLocaleDateString()}</div>
+                    </div>
+                    <div className="h-px bg-gray-200" />
                     {(Object.keys(data) as Array<keyof FormData>).map((key) => {
                         const value = data[key];
                         if (!value || (Array.isArray(value) && value.length === 0)) return null;
@@ -1046,70 +1306,113 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
                                     {(value as Shot[]).map((shot, index) => (
                                         <div key={shot.id} className="p-3 bg-gray-50 border border-gray-200 rounded-md">
                                             <p className="font-semibold text-gray-800">Shot #{index + 1}: {shot.priority && <span className="ml-2 text-xs font-bold text-indigo-600 bg-indigo-100 px-2 py-1 rounded-full">MUST-HAVE</span>}</p>
-                                            <p className="mt-1 text-sm text-gray-700">{shot.description || 'No description.'}</p>
-                                            <p className="mt-2 text-xs text-gray-500"><strong>Type:</strong> {shot.shotType} | <strong>Angle:</strong> {shot.angle}</p>
-                                            {shot.notes && <p className="mt-1 text-xs text-gray-500"><strong>Notes:</strong> {shot.notes}</p>}
+                                            <p className="mt-1 text-sm text-gray-700">{shot.description}</p>
+                                            <p className="text-xs text-gray-500">{shot.shotType} | {shot.angle} {shot.notes && `| ${shot.notes}`}</p>
                                         </div>
                                     ))}
                                 </div>
                             );
-                        } else if (key === 'moodboardFiles' && Array.isArray(value)) {
-                            content = <span className="text-gray-800">{(value as File[]).map((f) => f.name).join(', ')}</span>
-                        } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-                            content = <span className="text-gray-800">{Object.values(value).join(', ')}</span>;
-                        } else if(Array.isArray(value)) {
-                           content = <span className="text-gray-800">{value.join(', ')}</span>;
+                        } else if (key === 'budgetEstimate') {
+                            content = (
+                                <div className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-md">
+                                    <h4 className="font-semibold text-gray-800 mb-2">Estimated Budget Breakdown</h4>
+                                    <div className="text-sm text-gray-700 space-y-1">
+                                      {Object.entries(value.breakdown).map(([k,v]) => (
+                                        <div key={k} className="flex justify-between"><span>{k}</span><span>{new Intl.NumberFormat(undefined, { style: 'currency', currency: data.currency || 'USD' }).format(v)}</span></div>
+                                      ))}
+                                      <div className="flex justify-between font-bold pt-2 border-t"><span>Total</span><span>{new Intl.NumberFormat(undefined, { style: 'currency', currency: data.currency || 'USD' }).format(value.total)}</span></div>
+                                    </div>
+                                </div>
+                            );
+                        } else {
+                            content = (
+                                <div className="mt-2">
+                                    <span className="block text-sm font-medium text-gray-700">{key}</span>
+                                    <span className="block text-sm text-gray-600">{JSON.stringify(value, null, 2)}</span>
+                                </div>
+                            );
                         }
-                         else {
-                            content = <span className="text-gray-800" style={{whiteSpace: 'pre-wrap'}}>{String(value)}</span>;
-                        }
-                        
+
                         return (
-                            <div key={key}>
-                                <h3 className="text-sm font-semibold text-gray-500 capitalize">{key.replace(/([A-Z])/g, ' $1')}</h3>
+                            <div key={key} className="py-4 border-b last:border-0">
+                                <h3 className="text-lg font-semibold text-gray-800 mb-2 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</h3>
                                 {content}
                             </div>
                         );
                     })}
                 </div>
-
-                <div className="mt-8 pt-6 border-t border-gray-200">
-                    <h3 className="text-lg font-bold text-gray-800 mb-4">Finalize & Distribute</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <button onClick={handleShare} className="w-full px-4 py-3 bg-gray-100 text-gray-800 font-semibold rounded-md hover:bg-gray-200 transition-colors">Share Link</button>
-                        <button onClick={handleDownloadPdf} disabled={!scriptsLoaded} className="w-full px-4 py-3 bg-gray-100 text-gray-800 font-semibold rounded-md hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                            {scriptsLoaded ? 'Download PDF' : 'Loading...'}
+                
+                {/* Action buttons */}
+                <div className="flex flex-col md:flex-row md:justify-between md:items-center mt-6">
+                    <div className="flex gap-4 mb-4 md:mb-0">
+                        <button onClick={handleDownloadPdf} className="flex-1 px-4 py-2 bg-green-600 text-white font-semibold rounded-md hover:bg-green-700 transition-colors shadow-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 -ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v8m0 0l-2-2m2 2l2-2m-6 2a9 9 0 11-9-9 9 9 0 019 9z" />
+                            </svg>
+                            Download PDF
                         </button>
-                        <button onClick={() => setEmailModalOpen(true)} className="w-full px-4 py-3 bg-green-600 text-white font-semibold rounded-md hover:bg-green-700 transition-colors shadow-sm">Email Brief</button>
+                        <button onClick={handleShare} className="flex-1 px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 transition-colors shadow-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 -ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 8a6 6 0 10-8 0 6 6 0 008 0zM12 14v7m0 0l-2-2m2 2l2-2m-6 2a9 9 0 119-9 9 9 0 01-9 9z" />
+                            </svg>
+                            Share Brief
+                        </button>
                     </div>
-                </div>
-            </div>
-
-            {/* Modals for Share and Email */}
-            <Modal isOpen={isShareModalOpen} onClose={() => setShareModalOpen(false)} title="Shareable Link">
-                <p className="text-sm text-gray-600 mb-2">Anyone with this link can view the brief.</p>
-                <div className="flex gap-2">
-                    <input ref={shareLinkRef} type="text" readOnly value={shareLink} className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-md text-sm" />
-                    <button onClick={copyToClipboard} className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700">Copy</button>
-                </div>
-            </Modal>
-
-            <Modal isOpen={isEmailModalOpen} onClose={() => setEmailModalOpen(false)} title="Email Brief">
-                <div className="space-y-4">
-                    <Input 
-                        label="Recipient Emails"
-                        id="emailRecipients"
-                        placeholder="john@example.com, jane@example.com"
-                        value={emailRecipients}
-                        onChange={(e) => setEmailRecipients(e.target.value)}
-                    />
-                    <button onClick={handleSendEmail} disabled={isSending} className="w-full px-4 py-2 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 disabled:bg-indigo-300">
-                        {isSending ? 'Sending...' : 'Send'}
+                    <button onClick={() => setEmailModalOpen(true)} className="w-full md:w-auto px-4 py-2 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 transition-colors shadow-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 -ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8v13a2 2 0 002 2h14a2 2 0 002-2V8m-8 4h4m-4 0l-2 2m2-2l2-2m-6 2a9 9 0 119-9 9 9 0 01-9 9z" />
+                        </svg>
+                        Email Brief
                     </button>
                 </div>
-            </Modal>
+            </div>
+            <style>
+            {`
+              @keyframes fade-in {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
+              }
+              .animate-fade-in {
+                animation: fade-in 0.5s ease-out forwards;
+              }
+            `}
+            </style>
         </>
     );
+};
+
+const StatusDot = ({ status }: { status?: 'Not Started' | 'In Progress' | 'Complete' }) => {
+  const color = status === 'Complete' ? 'bg-green-500' : status === 'In Progress' ? 'bg-yellow-500' : 'bg-gray-300';
+  return <span className={`inline-block h-2.5 w-2.5 rounded-full ${color}`} />;
+};
+
+const StepMetaBar = ({ stepId, data, update }: { stepId: string; data: FormData; update: (k: keyof FormData, v: any) => void }) => {
+  const meta = data.stepMeta?.[stepId] || {};
+  const setMeta = (patch: Partial<{ owner: string; dueDate: string; status: 'Not Started' | 'In Progress' | 'Complete' }>) => {
+    update('stepMeta', { ...(data.stepMeta || {}), [stepId]: { ...meta, ...patch } });
+  };
+  return (
+    <div className="mb-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 p-3 bg-gray-50 border border-gray-200 rounded-md">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full">
+        <div>
+          <label className="block text-xs text-gray-600 mb-1">Owner</label>
+          <input value={meta.owner || ''} onChange={(e) => setMeta({ owner: e.target.value })} placeholder="Name or @user" className="w-full px-2 py-1.5 border rounded" />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-600 mb-1">Due Date</label>
+          <input type="date" value={meta.dueDate || ''} onChange={(e) => setMeta({ dueDate: e.target.value })} className="w-full px-2 py-1.5 border rounded" />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-600 mb-1">Status</label>
+          <select value={meta.status || 'Not Started'} onChange={(e) => setMeta({ status: e.target.value as any })} className="w-full px-2 py-1.5 border rounded">
+            <option>Not Started</option>
+            <option>In Progress</option>
+            <option>Complete</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 
@@ -1121,6 +1424,7 @@ export default function BriefBuilder() {
     const [wizardStarted, setWizardStarted] = useState(false);
     const [steps, setSteps] = useState<Step[]>([]);
     const [scriptsLoaded, setScriptsLoaded] = useState(false);
+    const [showClientInfoErrors, setShowClientInfoErrors] = useState(false);
 
     useEffect(() => {
         const jspdfSrc = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
@@ -1158,6 +1462,7 @@ export default function BriefBuilder() {
     const handleRoleSelect = (role: string) => {
         updateFormData('userRole', role);
         setWizardStarted(true);
+        setStep(1);
     };
 
     useEffect(() => {
@@ -1165,6 +1470,7 @@ export default function BriefBuilder() {
         if (!role) return;
 
         const baseSteps: Step[] = [
+            { id: 'client-info', title: 'Your Information', icon: <UserIcon /> },
             { id: 'details', title: 'Project Details', icon: <BriefcaseIcon /> },
             { id: 'moodboard', title: 'Mood Board', icon: <ImageIcon /> },
             { id: 'deliverables', title: 'Deliverables', icon: <CameraIcon /> },
@@ -1175,43 +1481,59 @@ export default function BriefBuilder() {
 
         if (role === 'Client') {
             setSteps([
-                baseSteps[0], // Details
-                baseSteps[1], // Moodboard
+                baseSteps[0], // Client Info
+                baseSteps[1], // Details
+                baseSteps[2], // Moodboard
                 { id: 'contact', title: 'Contact Info', icon: <MailIcon /> },
-                baseSteps[2], // Deliverables
-                baseSteps[3], // Shot List
+                baseSteps[3], // Deliverables
+                baseSteps[4], // Shot List
                 reviewStep
             ]);
         } else if (role === 'Photographer') {
             setSteps([
-                baseSteps[0], // Details
-                baseSteps[1], // Moodboard
+                baseSteps[0], // Client Info
+                baseSteps[1], // Details
+                baseSteps[2], // Moodboard
                 { id: 'location', title: 'Date & Location', icon: <MapPinIcon />},
-                baseSteps[2], // Deliverables
-                baseSteps[3], // Shot List
+                baseSteps[3], // Deliverables
+                baseSteps[4], // Shot List
                 { id: 'callsheet', title: 'Crew & Talent', icon: <UsersIcon /> },
                 reviewStep
             ]);
         } else if (role === 'Producer') {
             setSteps([
-                baseSteps[0], // Details
-                baseSteps[1], // Moodboard
+                baseSteps[0], // Client Info
+                baseSteps[1], // Details
+                baseSteps[2], // Moodboard
                 { id: 'location', title: 'Date & Location', icon: <MapPinIcon />},
-                baseSteps[2], // Deliverables
-                baseSteps[3], // Shot List
+                baseSteps[3], // Deliverables
+                baseSteps[4], // Shot List
                 { id: 'callsheet', title: 'Call Sheet & Logistics', icon: <UsersIcon /> },
                 reviewStep
             ]);
         }
     }, [formData.userRole]);
     
-    const nextStep = () => setStep(prev => Math.min(prev + 1, steps.length));
+    const nextStep = () => {
+        const currentStepId = steps[step - 1]?.id;
+        if (currentStepId === 'client-info') {
+            const nameOk = (formData.clientName || '').trim().length > 0;
+            const emailOk = (formData.clientEmail || '').trim().length > 0;
+            if (!nameOk || !emailOk) {
+                setShowClientInfoErrors(true);
+                return;
+            }
+        }
+        setShowClientInfoErrors(false);
+        setStep(prev => Math.min(prev + 1, steps.length));
+    };
     const prevStep = () => setStep(prev => Math.max(prev - 1, 1));
     const goToStep = (stepNumber: number) => setStep(stepNumber);
 
     const renderStep = () => {
         const currentStepId = steps[step - 1]?.id;
         switch (currentStepId) {
+            case 'client-info': return <ClientInfoStep data={formData} updateData={updateFormData} showErrors={showClientInfoErrors} />;
             case 'details': return <ProjectDetailsStep data={formData} updateData={updateFormData} />;
             case 'moodboard': return <MoodboardStep data={formData} updateData={updateFormData} />;
             case 'contact': return <ContactStep data={formData} updateData={updateFormData} />;
@@ -1231,8 +1553,10 @@ export default function BriefBuilder() {
     const currentStepConfig = steps[step - 1] || {};
     const isOptional = ['shotlist', 'callsheet', 'moodboard'].includes(currentStepConfig.id);
     const isFinalStep = step === steps.length;
+    const isClientInfo = currentStepConfig.id === 'client-info';
+    const isNextDisabled = isClientInfo && (!((formData.clientName || '').trim()) || !((formData.clientEmail || '').trim()));
 
-    return (
+    return (<>
         <div className="bg-gray-100 min-h-screen font-sans p-4 sm:p-6 lg:p-8">
             <div className="max-w-6xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden md:flex">
                 {/* Sidebar / Progress Bar */}
@@ -1240,19 +1564,26 @@ export default function BriefBuilder() {
                     <h1 className="text-2xl font-bold text-gray-900 mb-2">
                         {formData.userRole === 'Client' ? 'Project Inquiry' : 'Photography Brief'}
                     </h1>
-                    <p className="text-gray-600 mb-8">Created by a <span className="font-semibold">{formData.userRole}</span></p>
+                    <p className="text-gray-600 mb-8">Created by <span className="font-semibold">{formData.clientName || formData.userRole}</span></p>
                     <nav>
                         <ul className="space-y-4">
-                            {steps.map((s, index) => (
+                            {steps.map((s, index) => {
+                                const meta = (formData.stepMeta || {})[s.id];
+                                return (
                                 <li key={s.id}>
                                     <button onClick={() => goToStep(index + 1)} className={`w-full flex items-center text-left p-3 rounded-lg transition-colors duration-200 ${step === (index + 1) ? 'bg-indigo-100 text-indigo-700' : 'hover:bg-gray-200'}`}>
                                         <div className={`flex items-center justify-center h-10 w-10 rounded-full border-2 ${step >= (index + 1) ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-300 text-gray-500'}`}>
                                             {step > (index + 1) ? '✔' : (index + 1)}
                                         </div>
-                                        <span className="ml-4 font-medium">{s.title}</span>
+                                        <span className="ml-4 font-medium flex items-center gap-2">
+                                          <StatusDot status={meta?.status} />
+                                          {s.title}
+                                        </span>
+                                        {meta?.dueDate && <span className="ml-auto text-xs text-gray-500">Due {meta.dueDate}</span>}
                                     </button>
                                 </li>
-                            ))}
+                                );
+                            })}
                         </ul>
                     </nav>
                 </div>
@@ -1260,7 +1591,14 @@ export default function BriefBuilder() {
                 {/* Main Content */}
                 <div className="md:w-2/3 p-8 md:p-12 overflow-y-auto" style={{maxHeight: '90vh'}}>
                     <div className="animate-fade-in">
-                        {steps.length > 0 ? renderStep() : <div>Loading...</div>}
+                        {steps.length > 0 ? (
+                          <>
+                            {steps[step - 1]?.id !== 'review' && (
+                              <StepMetaBar stepId={steps[step - 1].id} data={formData} update={updateFormData} />
+                            )}
+                            {renderStep()}
+                          </>
+                        ) : <div>Loading...</div>}
                     </div>
                     
                     {/* Navigation */}
@@ -1275,7 +1613,7 @@ export default function BriefBuilder() {
                                {isOptional && (
                                     <button onClick={nextStep} className="px-6 py-2 mr-4 bg-white text-indigo-700 border border-gray-300 font-semibold rounded-md hover:bg-gray-50 transition-colors">Skip</button>
                                )}
-                               <button onClick={nextStep} className="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 transition-colors shadow-sm">Next</button>
+                               <button onClick={nextStep} disabled={isNextDisabled} className="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
                             </div>
                         </div>
                     )}
@@ -1292,7 +1630,6 @@ export default function BriefBuilder() {
               }
             `}
             </style>
-        </div>
+        </>
     );
-}
-
+};
