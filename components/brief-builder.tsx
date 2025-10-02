@@ -61,12 +61,27 @@ type StepProps = {
 };
 
 // Extend the Window interface for global libraries
+interface JsPDF {
+    internal: {
+        pageSize: {
+            getWidth: () => number;
+            getHeight: () => number;
+        };
+    };
+    addImage: (data: string, type: string, x: number, y: number, width: number, height: number) => void;
+    save: (filename: string) => void;
+}
+
+interface Html2Canvas {
+    (element: HTMLElement, options?: { scale?: number }): Promise<HTMLCanvasElement>;
+}
+
 declare global {
     interface Window {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        jspdf: any;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        html2canvas: any;
+        jspdf: {
+            jsPDF: new () => JsPDF;
+        };
+        html2canvas: Html2Canvas;
     }
 }
 
@@ -134,13 +149,19 @@ const ImageIcon = () => (
 );
 const SparklesIcon = ({ className }: { className: string }) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-        <path d="m12 3-1.9 4.2-4.2 1.9 4.2 1.9L12 15l1.9-4.2 4.2-1.9-4.2-1.9L12 3zM3 12l1.9 4.2 4.2 1.9-4.2 1.9L3 24l-1.9-4.2-4.2-1.9 4.2-1.9L3 12zM21 12l-1.9 4.2-4.2 1.9 4.2 1.9L21 24l1.9-4.2 4.2-1.9-4.2-1.9L21 12z"></path>
+        <path d="M12 3L10.1 7.2L5.9 9.1L10.1 11L12 15L13.9 10.8L18.1 8.9L13.9 7L12 3Z"></path>
+        <path d="M3 12L4.9 16.2L9.1 18.1L4.9 20L3 24L4.9 19.8L9.1 17.9L4.9 16L3 12Z"></path>
+        <path d="M21 12L19.1 16.2L14.9 18.1L19.1 20L21 24L19.1 19.8L14.9 17.9L19.1 16L21 12Z"></path>
     </svg>
 );
 
 // --- API HELPER ---
 async function callGeminiAPI(prompt: string, jsonSchema: Record<string, unknown> | null = null) {
-  const apiKey = ""; // This will be handled by the environment.
+  const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+  if (!apiKey) {
+    console.error('Gemini API key not found in environment variables');
+    return null;
+  }
   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
 
   const payload: {
@@ -652,7 +673,12 @@ const CallSheetStep = ({ data, updateData }: StepProps) => {
     );
 };
 
-const ReviewStep = ({ data, scriptsLoaded }: { data: FormData, scriptsLoaded: boolean }) => {
+interface ReviewStepProps {
+    data: FormData;
+    scriptsLoaded: boolean;
+}
+
+const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
     const [isEmailModalOpen, setEmailModalOpen] = useState(false);
     const [isShareModalOpen, setShareModalOpen] = useState(false);
     const [shareLink, setShareLink] = useState('');
@@ -668,9 +694,13 @@ const ReviewStep = ({ data, scriptsLoaded }: { data: FormData, scriptsLoaded: bo
         }
         const { jsPDF } = window.jspdf;
         const input = briefContentRef.current;
+        if (!input) {
+            alert("Content not ready for PDF generation.");
+            return;
+        }
         window.html2canvas(input, { scale: 2 }).then((canvas: HTMLCanvasElement) => {
             const imgData = canvas.toDataURL('image/png');
-            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pdf = new jsPDF();
             const pdfWidth = pdf.internal.pageSize.getWidth();
             const pdfHeight = pdf.internal.pageSize.getHeight();
             const canvasWidth = canvas.width;
