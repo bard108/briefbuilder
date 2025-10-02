@@ -609,46 +609,6 @@ const DeliverablesStep = ({ data, updateData }: StepProps) => {
         updateData(group, newSelection);
     };
 
-    const currency = data.currency || 'USD';
-    const fx = (v: number) => {
-        const f = new Intl.NumberFormat(undefined, { style: 'currency', currency }).format;
-        return f(v);
-    };
-
-    const estimateBudget = () => {
-        const base: Record<string, number> = {
-            photography: 1500,
-            video: 2200,
-            socialAssets: 600,
-            other: 400,
-        };
-        const usageMul: Record<string, number> = {
-            print: 1.2, website: 1.1, social: 1.1, advertising: 1.6, internal: 1.0, other: 1.0
-        };
-        const crew = (data.crew || []).length;
-        const deliverables = data.deliverables || [];
-        const rights = data.usageRights || [];
-
-        const breakdown: Record<string, number> = {};
-        let total = 0;
-        deliverables.forEach(d => {
-            const subtotal = base[d] || 0;
-            breakdown[`Deliverable: ${d}`] = subtotal;
-            total += subtotal;
-        });
-        const rightsMul = rights.reduce((acc, r) => acc * (usageMul[r] || 1.0), 1.0);
-        if (rightsMul !== 1.0) {
-            breakdown['Usage multiplier'] = parseFloat((total * (rightsMul - 1)).toFixed(2));
-            total = parseFloat((total * rightsMul).toFixed(2));
-        }
-        if (crew > 0) {
-            const crewCost = crew * 250; // simple heuristic
-            breakdown['Crew'] = crewCost;
-            total += crewCost;
-        }
-        updateData('budgetEstimate', { total, breakdown });
-    };
-
     return (
         <div className="space-y-8">
             <h2 className="text-2xl font-bold text-gray-800">Deliverables & Usage</h2>
@@ -656,50 +616,7 @@ const DeliverablesStep = ({ data, updateData }: StepProps) => {
                 {data.userRole === 'Client' ? "Let us know what you need. Don't worry if you're unsure about the technical details." : "Select the required deliverables and specify technical requirements."}
             </p>
             
-            <div className="flex items-end gap-3">
-              <CheckboxGroup legend="Which deliverables are required?" options={deliverableOptions} selectedOptions={data.deliverables || []} onChange={(id) => handleCheckboxChange('deliverables', id)} />
-
-              {/* Budget Estimator */}
-              <div className="p-4 bg-white border rounded-md">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <h3 className="text-md font-semibold text-gray-800">Budget Estimator</h3>
-                    <div>
-                      <label className="block text-xs text-gray-600">Currency</label>
-                      <select value={data.currency || 'USD'} onChange={(e) => updateData('currency', e.target.value as any)} className="px-2 py-1 border rounded">
-                        <option value="USD">USD</option>
-                        <option value="EUR">EUR</option>
-                        <option value="GBP">GBP</option>
-                      </select>
-                    </div>
-                  </div>
-                  <button onClick={() => {
-                    const base: Record<string, number> = { photography: 1500, video: 2200, socialAssets: 600, other: 400 };
-                    const usageMul: Record<string, number> = { print: 1.2, website: 1.1, social: 1.1, advertising: 1.6, internal: 1.0, other: 1.0 };
-                    const crew = (data.crew || []).length;
-                    const deliverables = data.deliverables || [];
-                    const rights = data.usageRights || [];
-                    const breakdown: Record<string, number> = {};
-                    let total = 0;
-                    deliverables.forEach(d => { const sub = base[d] || 0; breakdown[`Deliverable: ${d}`] = sub; total += sub; });
-                    const mul = rights.reduce((acc, r) => acc * (usageMul[r] || 1.0), 1.0);
-                    if (mul !== 1.0) { breakdown['Usage multiplier'] = parseFloat((total * (mul - 1)).toFixed(2)); total = parseFloat((total * mul).toFixed(2)); }
-                    if (crew > 0) { const c = crew * 250; breakdown['Crew'] = c; total += c; }
-                    updateData('budgetEstimate', { total, breakdown });
-                  }} className="px-3 py-1.5 border border-indigo-600 text-indigo-600 text-sm font-semibold rounded-md hover:bg-indigo-50">Estimate</button>
-                </div>
-                {data.budgetEstimate ? (
-                  <div className="text-sm text-gray-700 space-y-1">
-                    {Object.entries(data.budgetEstimate.breakdown).map(([k,v]) => (
-                      <div key={k} className="flex justify-between"><span>{k}</span><span>{new Intl.NumberFormat(undefined, { style: 'currency', currency: data.currency || 'USD' }).format(v)}</span></div>
-                    ))}
-                    <div className="flex justify-between font-bold pt-2 border-t"><span>Total</span><span>{new Intl.NumberFormat(undefined, { style: 'currency', currency: data.currency || 'USD' }).format(data.budgetEstimate.total)}</span></div>
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-500">Select deliverables, usage rights, and crew, then click Estimate.</p>
-                )}
-              </div>
-            </div>
+            <CheckboxGroup legend="Which deliverables are required?" options={deliverableOptions} selectedOptions={data.deliverables || []} onChange={(id) => handleCheckboxChange('deliverables', id)} />
 
             {data.deliverables?.includes('photography') && (
                 <div className="space-y-8 p-6 bg-gray-50 rounded-lg border border-gray-200 animate-fade-in">
@@ -727,30 +644,9 @@ const ShotListStep = ({ data, updateData }: StepProps) => {
 
     const generateShotList = async () => {
         setIsLoading(true);
-        const prompt = `You are a helpful assistant for photographers and producers. Based on the following photography project brief, generate a detailed shot list of 5-7 ideas. 
-        Project Name: "${data.projectName || 'Not specified'}"
-        Project Type: "${data.projectType || 'Not specified'}"
-        Project Overview: "${data.overview || 'Not specified'}"
-        Key Objectives: "${data.objectives || 'Not specified'}"
-
-        Return the shot list as a JSON array of objects. Each object should have keys: "description" (string), "shotType" (one of "Wide", "Medium", "Close-up", "Detail", "Overhead"), "angle" (one of "Eye-level", "High Angle", "Low Angle"), and "notes" (string, can be empty).`;
-        
-        const shotListSchema = {
-            type: "ARRAY",
-            items: {
-                type: "OBJECT",
-                properties: {
-                    description: { type: "STRING" },
-                    shotType: { type: "STRING" },
-                    angle: { type: "STRING" },
-                    notes: { type: "STRING" },
-                },
-                required: ["description", "shotType", "angle", "notes"]
-            }
-        };
-
+        const prompt = `You are a helpful assistant for photographers and producers. Based on the following photography project brief, generate a detailed shot list of 5-7 ideas. \n        Project Name: "${data.projectName || 'Not specified'}"\n        Project Type: "${data.projectType || 'Not specified'}"\n        Project Overview: "${data.overview || 'Not specified'}"\n        Key Objectives: "${data.objectives || 'Not specified'}"\n\n        Return the shot list as a JSON array of objects. Each object should have keys: "description" (string), "shotType" (one of "Wide", "Medium", "Close-up", "Detail", "Overhead"), "angle" (one of "Eye-level", "High Angle", "Low Angle"), and "notes" (string, can be empty).`;
+        const shotListSchema = { type: "ARRAY", items: { type: "OBJECT", properties: { description: { type: "STRING" }, shotType: { type: "STRING" }, angle: { type: "STRING" }, notes: { type: "STRING" }, }, required: ["description", "shotType", "angle", "notes"] } };
         const result = await callGeminiAPI(prompt, shotListSchema);
-        
         if (result) {
             try {
                 const newShotsData = JSON.parse(result) as Omit<Shot, 'id' | 'priority'>[];
@@ -772,6 +668,25 @@ const ShotListStep = ({ data, updateData }: StepProps) => {
     const handleShotChange = (id: number, field: keyof Shot, value: string | boolean) => {
         const newShotList = shotList.map((shot) => shot.id === id ? { ...shot, [field]: value } : shot);
         updateData('shotList', newShotList);
+    };
+
+    const estimateFromShots = () => {
+        const basePerShot = 200; // simple heuristic base
+        const priorityUplift = 100; // extra per priority shot
+        const prepOverheadRate = 0.1; // 10% overhead
+
+        const totalShots = shotList.length;
+        const priorityShots = shotList.filter(s => s.priority).length;
+        const base = basePerShot * totalShots;
+        const uplift = priorityUplift * priorityShots;
+        const subtotal = base + uplift;
+        const overhead = parseFloat((subtotal * prepOverheadRate).toFixed(2));
+        const breakdown: Record<string, number> = {};
+        breakdown['Shots (' + totalShots + ' x ' + basePerShot + ')'] = base;
+        if (priorityShots > 0) breakdown['Priority uplift (' + priorityShots + ' x ' + priorityUplift + ')'] = uplift;
+        breakdown['Prep/Overhead (10%)'] = overhead;
+        const total = parseFloat((subtotal + overhead).toFixed(2));
+        updateData('budgetEstimate', { total, breakdown });
     };
 
     return (
@@ -814,6 +729,32 @@ const ShotListStep = ({ data, updateData }: StepProps) => {
                 ))}
             </div>
             <button onClick={addShot} className="w-full flex justify-center items-center px-4 py-2 border border-dashed border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">+ Add Shot</button>
+
+            {/* Budget Estimator from Shot List */}
+            <div className="space-y-3 p-4 bg-white border rounded-md">
+                <div className="flex items-center justify-between">
+                    <h3 className="text-md font-semibold text-gray-800">Budget Estimator (from Shot List)</h3>
+                    <div className="flex items-center gap-2">
+                        <label className="text-xs text-gray-600">Currency</label>
+                        <select value={data.currency || 'USD'} onChange={(e) => updateData('currency', e.target.value as any)} className="px-2 py-1 border rounded text-sm">
+                            <option value="USD">USD</option>
+                            <option value="EUR">EUR</option>
+                            <option value="GBP">GBP</option>
+                        </select>
+                    </div>
+                </div>
+                <button onClick={estimateFromShots} className="px-3 py-1.5 border border-indigo-600 text-indigo-600 text-sm font-semibold rounded-md hover:bg-indigo-50">Estimate from Shot List</button>
+                {data.budgetEstimate ? (
+                    <div className="text-sm text-gray-700 space-y-1">
+                        {Object.entries(data.budgetEstimate.breakdown).map(([k,v]) => (
+                            <div key={k} className="flex justify-between"><span>{k}</span><span>{new Intl.NumberFormat(undefined, { style: 'currency', currency: data.currency || 'USD' }).format(v)}</span></div>
+                        ))}
+                        <div className="flex justify-between font-bold pt-2 border-t"><span>Total</span><span>{new Intl.NumberFormat(undefined, { style: 'currency', currency: data.currency || 'USD' }).format(data.budgetEstimate.total)}</span></div>
+                    </div>
+                ) : (
+                    <p className="text-sm text-gray-500">Add shots and click Estimate.</p>
+                )}
+            </div>
         </div>
     );
 };
@@ -1249,30 +1190,6 @@ export default function BriefBuilder() {
                     <h1 className="text-2xl font-bold text-gray-900 mb-2">
                         {formData.userRole === 'Client' ? 'Project Inquiry' : 'Photography Brief'}
                     </h1>
-                    <p className="text-gray-600 mb-8">Created by <span className="font-semibold">{formData.clientName || formData.userRole}</span></p>
-                    <nav>
-                        <ul className="space-y-4">
-                            {steps.map((s, index) => (
-                                <li key={s.id}>
-                                    <button onClick={() => goToStep(index + 1)} className={`w-full flex items-center text-left p-3 rounded-lg transition-colors duration-200 ${step === (index + 1) ? 'bg-indigo-100 text-indigo-700' : 'text-gray-800 hover:bg-gray-200'}`}>
-                                        <div className={`flex items-center justify-center h-10 w-10 rounded-full border-2 ${step >= (index + 1) ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-300 text-gray-700'}`}>
-                                            {step > (index + 1) ? '✔' : (index + 1)}
-                                        </div>
-                                        <span className="ml-4 font-medium">{s.title}</span>
-                                    </button>
-                                </li>
-                            ))}
-                        </ul>
-                    </nav>
-                </div>
-
-                {/* Main Content */}
-                <div className="md:w-2/3 p-8 md:p-12 overflow-y-auto" style={{maxHeight: '90vh'}}>
-                    <div className="animate-fade-in">
-                        {steps.length > 0 ? renderStep() : <div>Loading...</div>}
-                    </div>
-                    
-                    {/* Navigation */}
                     {!isFinalStep && (
                         <div className="mt-12 pt-6 border-t border-gray-200 flex justify-between items-center">
                             <div>
