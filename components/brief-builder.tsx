@@ -734,7 +734,7 @@ const ReviewStep = ({ data, scriptsLoaded }: { data: FormData, scriptsLoaded: bo
                 <h2 className="text-2xl font-bold text-gray-800">Review & Distribute</h2>
                 <p className="text-gray-600">Please review all the details below. Once you&apos;re happy, choose how you&apos;d like to share or save the document.</p>
                 <div id="brief-content-for-pdf" ref={briefContentRef} className="space-y-8 p-6 bg-white rounded-lg border border-gray-200">
-                    {(Object.keys(data) as Array<keyof typeof data>).map((key) => {
+                    {(Object.keys(data) as Array<keyof FormData>).map((key) => {
                         const value = data[key];
                         if (!value || (Array.isArray(value) && value.length === 0)) return null;
                         
@@ -742,7 +742,7 @@ const ReviewStep = ({ data, scriptsLoaded }: { data: FormData, scriptsLoaded: bo
                         if (key === 'crew' && Array.isArray(value)) {
                             content = (
                                 <div className="mt-2 space-y-3">
-                                    {value.map((member: CrewMember) => (
+                                    {(value as CrewMember[]).map((member) => (
                                         <div key={member.id} className="p-3 bg-gray-50 border border-gray-200 rounded-md">
                                             <p className="font-semibold text-gray-800">{member.name || 'No Name'} - <span className="font-normal text-gray-600">{member.role || 'No Role'}</span></p>
                                             <p className="text-sm text-gray-600">Call: {member.callTime || 'TBD'} | Contact: {member.contact || 'N/A'}</p>
@@ -753,7 +753,7 @@ const ReviewStep = ({ data, scriptsLoaded }: { data: FormData, scriptsLoaded: bo
                         } else if (key === 'shotList' && Array.isArray(value)) {
                             content = (
                                 <div className="mt-2 space-y-3">
-                                    {value.map((shot: Shot, index: number) => (
+                                    {(value as Shot[]).map((shot, index) => (
                                         <div key={shot.id} className="p-3 bg-gray-50 border border-gray-200 rounded-md">
                                             <p className="font-semibold text-gray-800">Shot #{index + 1}: {shot.priority && <span className="ml-2 text-xs font-bold text-indigo-600 bg-indigo-100 px-2 py-1 rounded-full">MUST-HAVE</span>}</p>
                                             <p className="mt-1 text-sm text-gray-700">{shot.description || 'No description.'}</p>
@@ -764,10 +764,13 @@ const ReviewStep = ({ data, scriptsLoaded }: { data: FormData, scriptsLoaded: bo
                                 </div>
                             );
                         } else if (key === 'moodboardFiles' && Array.isArray(value)) {
-                            content = <span className="text-gray-800">{value.map((f: File) => f.name).join(', ')}</span>
-                        } else if (typeof value === 'object' && value !== null) {
+                            content = <span className="text-gray-800">{(value as File[]).map((f) => f.name).join(', ')}</span>
+                        } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
                             content = <span className="text-gray-800">{Object.values(value).join(', ')}</span>;
-                        } else {
+                        } else if(Array.isArray(value)) {
+                           content = <span className="text-gray-800">{value.join(', ')}</span>;
+                        }
+                         else {
                             content = <span className="text-gray-800" style={{whiteSpace: 'pre-wrap'}}>{String(value)}</span>;
                         }
                         
