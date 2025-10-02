@@ -695,46 +695,6 @@ const DeliverablesStep = ({ data, updateData }: StepProps) => {
                     <CheckboxGroup legend="Required Social Platforms / Aspect Ratios" options={socialPlatformOptions} selectedOptions={data.socialPlatforms || []} onChange={(id) => handleCheckboxChange('socialPlatforms', id)} />
                 </div>
             )}
-
-            <div className="p-4 bg-white border rounded-md">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <h3 className="text-md font-semibold text-gray-800">Budget Estimator</h3>
-                  <div>
-                    <label className="block text-xs text-gray-600">Currency</label>
-                    <select value={data.currency || 'USD'} onChange={(e) => updateData('currency', e.target.value as any)} className="px-2 py-1 border rounded">
-                      <option value="USD">USD</option>
-                      <option value="EUR">EUR</option>
-                      <option value="GBP">GBP</option>
-                    </select>
-                  </div>
-                </div>
-                <button onClick={() => {
-                  const base: Record<string, number> = { photography: 1500, video: 2200, socialAssets: 600, other: 400 };
-                  const usageMul: Record<string, number> = { print: 1.2, website: 1.1, social: 1.1, advertising: 1.6, internal: 1.0, other: 1.0 };
-                  const crew = (data.crew || []).length;
-                  const deliverables = data.deliverables || [];
-                  const rights = data.usageRights || [];
-                  const breakdown: Record<string, number> = {};
-                  let total = 0;
-                  deliverables.forEach(d => { const sub = base[d] || 0; breakdown[`Deliverable: ${d}`] = sub; total += sub; });
-                  const mul = rights.reduce((acc, r) => acc * (usageMul[r] || 1.0), 1.0);
-                  if (mul !== 1.0) { breakdown['Usage multiplier'] = parseFloat((total * (mul - 1)).toFixed(2)); total = parseFloat((total * mul).toFixed(2)); }
-                  if (crew > 0) { const c = crew * 250; breakdown['Crew'] = c; total += c; }
-                  updateData('budgetEstimate', { total, breakdown });
-                }} className="px-3 py-1.5 border border-indigo-600 text-indigo-600 text-sm font-semibold rounded-md hover:bg-indigo-50">Estimate</button>
-              </div>
-              {data.budgetEstimate ? (
-                <div className="text-sm text-gray-700 space-y-1">
-                  {Object.entries(data.budgetEstimate.breakdown).map(([k,v]) => (
-                    <div key={k} className="flex justify-between"><span>{k}</span><span>{new Intl.NumberFormat(undefined, { style: 'currency', currency: data.currency || 'USD' }).format(v)}</span></div>
-                  ))}
-                  <div className="flex justify-between font-bold pt-2 border-t"><span>Total</span><span>{new Intl.NumberFormat(undefined, { style: 'currency', currency: data.currency || 'USD' }).format(data.budgetEstimate.total)}</span></div>
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500">Select deliverables, usage rights, and crew, then click Estimate.</p>
-              )}
-            </div>
         </div>
     );
 };
@@ -1313,14 +1273,15 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
                                 </div>
                             );
                         } else if (key === 'budgetEstimate') {
+                            const estimate = value as { total: number; breakdown: Record<string, number> };
                             content = (
                                 <div className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-md">
                                     <h4 className="font-semibold text-gray-800 mb-2">Estimated Budget Breakdown</h4>
                                     <div className="text-sm text-gray-700 space-y-1">
-                                      {Object.entries(value.breakdown).map(([k,v]) => (
+                                      {Object.entries(estimate.breakdown).map(([k,v]) => (
                                         <div key={k} className="flex justify-between"><span>{k}</span><span>{new Intl.NumberFormat(undefined, { style: 'currency', currency: data.currency || 'USD' }).format(v)}</span></div>
                                       ))}
-                                      <div className="flex justify-between font-bold pt-2 border-t"><span>Total</span><span>{new Intl.NumberFormat(undefined, { style: 'currency', currency: data.currency || 'USD' }).format(value.total)}</span></div>
+                                      <div className="flex justify-between font-bold pt-2 border-t"><span>Total</span><span>{new Intl.NumberFormat(undefined, { style: 'currency', currency: data.currency || 'USD' }).format(estimate.total)}</span></div>
                                     </div>
                                 </div>
                             );
@@ -1380,41 +1341,6 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
         </>
     );
 };
-
-const StatusDot = ({ status }: { status?: 'Not Started' | 'In Progress' | 'Complete' }) => {
-  const color = status === 'Complete' ? 'bg-green-500' : status === 'In Progress' ? 'bg-yellow-500' : 'bg-gray-300';
-  return <span className={`inline-block h-2.5 w-2.5 rounded-full ${color}`} />;
-};
-
-const StepMetaBar = ({ stepId, data, update }: { stepId: string; data: FormData; update: (k: keyof FormData, v: any) => void }) => {
-  const meta = data.stepMeta?.[stepId] || {};
-  const setMeta = (patch: Partial<{ owner: string; dueDate: string; status: 'Not Started' | 'In Progress' | 'Complete' }>) => {
-    update('stepMeta', { ...(data.stepMeta || {}), [stepId]: { ...meta, ...patch } });
-  };
-  return (
-    <div className="mb-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 p-3 bg-gray-50 border border-gray-200 rounded-md">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full">
-        <div>
-          <label className="block text-xs text-gray-600 mb-1">Owner</label>
-          <input value={meta.owner || ''} onChange={(e) => setMeta({ owner: e.target.value })} placeholder="Name or @user" className="w-full px-2 py-1.5 border rounded" />
-        </div>
-        <div>
-          <label className="block text-xs text-gray-600 mb-1">Due Date</label>
-          <input type="date" value={meta.dueDate || ''} onChange={(e) => setMeta({ dueDate: e.target.value })} className="w-full px-2 py-1.5 border rounded" />
-        </div>
-        <div>
-          <label className="block text-xs text-gray-600 mb-1">Status</label>
-          <select value={meta.status || 'Not Started'} onChange={(e) => setMeta({ status: e.target.value as any })} className="w-full px-2 py-1.5 border rounded">
-            <option>Not Started</option>
-            <option>In Progress</option>
-            <option>Complete</option>
-          </select>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 
 // --- MAIN APP COMPONENT ---
 
@@ -1550,13 +1476,13 @@ export default function BriefBuilder() {
         return <StartPage onSelectRole={handleRoleSelect} />;
     }
 
-    const currentStepConfig = steps[step - 1] || {};
+    const currentStepConfig = steps[step - 1] || {} as Step;
     const isOptional = ['shotlist', 'callsheet', 'moodboard'].includes(currentStepConfig.id);
     const isFinalStep = step === steps.length;
     const isClientInfo = currentStepConfig.id === 'client-info';
     const isNextDisabled = isClientInfo && (!((formData.clientName || '').trim()) || !((formData.clientEmail || '').trim()));
 
-    return (<>
+    return (
         <div className="bg-gray-100 min-h-screen font-sans p-4 sm:p-6 lg:p-8">
             <div className="max-w-6xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden md:flex">
                 {/* Sidebar / Progress Bar */}
@@ -1567,23 +1493,16 @@ export default function BriefBuilder() {
                     <p className="text-gray-600 mb-8">Created by <span className="font-semibold">{formData.clientName || formData.userRole}</span></p>
                     <nav>
                         <ul className="space-y-4">
-                            {steps.map((s, index) => {
-                                const meta = (formData.stepMeta || {})[s.id];
-                                return (
+                            {steps.map((s, index) => (
                                 <li key={s.id}>
                                     <button onClick={() => goToStep(index + 1)} className={`w-full flex items-center text-left p-3 rounded-lg transition-colors duration-200 ${step === (index + 1) ? 'bg-indigo-100 text-indigo-700' : 'hover:bg-gray-200'}`}>
                                         <div className={`flex items-center justify-center h-10 w-10 rounded-full border-2 ${step >= (index + 1) ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-300 text-gray-500'}`}>
                                             {step > (index + 1) ? '✔' : (index + 1)}
                                         </div>
-                                        <span className="ml-4 font-medium flex items-center gap-2">
-                                          <StatusDot status={meta?.status} />
-                                          {s.title}
-                                        </span>
-                                        {meta?.dueDate && <span className="ml-auto text-xs text-gray-500">Due {meta.dueDate}</span>}
+                                        <span className="ml-4 font-medium">{s.title}</span>
                                     </button>
                                 </li>
-                                );
-                            })}
+                            ))}
                         </ul>
                     </nav>
                 </div>
@@ -1591,14 +1510,7 @@ export default function BriefBuilder() {
                 {/* Main Content */}
                 <div className="md:w-2/3 p-8 md:p-12 overflow-y-auto" style={{maxHeight: '90vh'}}>
                     <div className="animate-fade-in">
-                        {steps.length > 0 ? (
-                          <>
-                            {steps[step - 1]?.id !== 'review' && (
-                              <StepMetaBar stepId={steps[step - 1].id} data={formData} update={updateFormData} />
-                            )}
-                            {renderStep()}
-                          </>
-                        ) : <div>Loading...</div>}
+                        {steps.length > 0 ? renderStep() : <div>Loading...</div>}
                     </div>
                     
                     {/* Navigation */}
@@ -1630,6 +1542,6 @@ export default function BriefBuilder() {
               }
             `}
             </style>
-        </>
+        </div>
     );
-};
+}
