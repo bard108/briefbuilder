@@ -297,14 +297,14 @@ const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose:
 const Input = ({ label, id, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { label: string; id: string }) => (
     <div>
         <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-        <input id={id} className="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" {...props} />
+        <input id={id} className="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" {...props} />
     </div>
 );
 
 const Select = ({ label, id, children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement> & { label: string; id: string; children: React.ReactNode }) => (
      <div>
         <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-        <select id={id} className="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" {...props}>
+        <select id={id} className="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" {...props}>
             {children}
         </select>
     </div>
@@ -313,7 +313,7 @@ const Select = ({ label, id, children, ...props }: React.SelectHTMLAttributes<HT
 const Textarea = ({ label, id, ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { label: string; id: string }) => (
     <div>
         <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-        <textarea id={id} rows={4} className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" {...props}></textarea>
+        <textarea id={id} rows={4} className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" {...props}></textarea>
     </div>
 );
 
@@ -374,14 +374,36 @@ const ProjectDetailsStep = ({ data, updateData }: StepProps) => {
             return;
         }
         setIsLoading(true);
-        const prompt = `Based on the project name "${data.projectName}", generate a concise, one-paragraph project overview and a short, bulleted list of 3-4 key objectives for a photography brief. Format the output as plain text.`;
+        const prompt = `Based on the project name "${data.projectName}", generate a concise, one-paragraph project overview and a short, bulleted list of 3-4 key objectives for a photography brief. Return either JSON {overview: string, objectives: string[]} or plain text titled Overview: and Objectives:.`;
         const result = await callGeminiAPI(prompt);
         if (result) {
-            const overviewMatch = result.match(/Overview:([\s\S]*?)Objectives:/);
-            const objectivesMatch = result.match(/Objectives:([\s\S]*)/);
-            
-            if(overviewMatch && overviewMatch[1]) updateData('overview', overviewMatch[1].trim());
-            if(objectivesMatch && objectivesMatch[1]) updateData('objectives', objectivesMatch[1].trim());
+            try {
+                let text = result;
+                const codeMatch = text.match(/```[a-zA-Z]*\n([\s\S]*?)```/);
+                if (codeMatch) text = codeMatch[1].trim();
+
+                if (text.trim().startsWith('{') || text.trim().startsWith('[')) {
+                    const obj = JSON.parse(text);
+                    if (obj.overview) updateData('overview', String(obj.overview).trim());
+                    if (obj.objectives) {
+                        const arr = Array.isArray(obj.objectives) ? obj.objectives : String(obj.objectives).split(/\n|\r/);
+                        const cleaned = arr.map((l: string) => l.replace(/^[-*\s]+/, '').trim()).filter(Boolean).join('\n• ');
+                        updateData('objectives', '• ' + cleaned);
+                    }
+                } else {
+                    const cleaned = text.replace(/\*\*/g, '').replace(/^#+\s*/gm, '');
+                    const oMatch = cleaned.match(/Overview:([\s\S]*?)(Objectives?:|$)/i);
+                    const objMatch = cleaned.match(/Objectives?:([\s\S]*)/i);
+                    if (oMatch && oMatch[1]) updateData('overview', oMatch[1].trim());
+                    if (objMatch && objMatch[1]) {
+                        const lines = objMatch[1].split(/\r?\n/).map(l => l.replace(/^[-*\s]+/, '').trim()).filter(Boolean);
+                        if (lines.length) updateData('objectives', '• ' + lines.join('\n• '));
+                    }
+                }
+            } catch (e) {
+                console.warn('Failed to parse AI output, storing raw text.');
+                updateData('overview', result.substring(0, 600));
+            }
         }
         setIsLoading(false);
     };
@@ -1214,37 +1236,7 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
                     body: JSON.stringify({ recipients, subject: `Brief: ${data.projectName || 'Untitled'}`, html: htmlContent }),
                 });
 
-                const json = await resp.json();
-                if (!resp.ok) {
-                    console.error('Email send failed:', json);
-                    alert(`Failed to send email: ${json?.error || resp.statusText}`);
-                } else {
-                    alert('Email sent successfully');
-                    setEmailModalOpen(false);
-                    setAdditionalRecipients('');
-                }
-            } catch (err) {
-                console.error('Error sending email:', err);
-                alert('Failed to send email. See console for details.');
-            } finally {
-                setIsSending(false);
-            }
-        })();
-    };
-
-    return (
-        <>
-            <div className="space-y-6">
-                <h2 className="text-2xl font-bold text-gray-800">Review & Distribute</h2>
-                <p className="text-gray-600">Please review all the details below. Once you&apos;re happy, choose how you&apos;d like to share or save the document.</p>
-                <div id="brief-content-for-pdf" ref={briefContentRef} className="space-y-8 p-6 bg-white rounded-lg border border-gray-200">
-                    {/* PDF Header with project title and creator */}
-                    <div className="flex items-baseline justify-between mb-2">
-                        <h1 className="text-xl font-bold text-gray-900">{data.projectName || 'Untitled Brief'}</h1>
-                        <div className="text-xs text-gray-500">Created by {data.clientName || data.userRole || 'Unknown'} • {new Date().toLocaleDateString()}</div>
-                    </div>
-                    <div className="h-px bg-gray-200" />
-                    {/* Structured sections - render only when filled */}
+                const json =
                     <div className="space-y-6">
                       {(data.projectName || data.projectType || data.budget || data.overview || data.objectives || data.audience) && (
                         <div>
@@ -1535,8 +1527,8 @@ export default function BriefBuilder() {
                         <ul className="space-y-4">
                             {steps.map((s, index) => (
                                 <li key={s.id}>
-                                    <button onClick={() => goToStep(index + 1)} className={`w-full flex items-center text-left p-3 rounded-lg transition-colors duration-200 ${step === (index + 1) ? 'bg-indigo-100 text-indigo-700' : 'hover:bg-gray-200'}`}>
-                                        <div className={`flex items-center justify-center h-10 w-10 rounded-full border-2 ${step >= (index + 1) ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-300 text-gray-500'}`}>
+                                    <button onClick={() => goToStep(index + 1)} className={`w-full flex items-center text-left p-3 rounded-lg transition-colors duration-200 ${step === (index + 1) ? 'bg-indigo-100 text-indigo-700' : 'text-gray-800 hover:bg-gray-200'}`}>
+                                        <div className={`flex items-center justify-center h-10 w-10 rounded-full border-2 ${step >= (index + 1) ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-300 text-gray-700'}`}>
                                             {step > (index + 1) ? '✔' : (index + 1)}
                                         </div>
                                         <span className="ml-4 font-medium">{s.title}</span>
