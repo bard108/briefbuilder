@@ -952,11 +952,11 @@ export default function BriefBuilder() {
         switch (currentStepId) {
             case 'details': return <ProjectDetailsStep data={formData} updateData={updateFormData} />;
             case 'moodboard': return <MoodboardStep data={formData} updateData={updateFormData} />;
-            case 'contact': return <ContactStep data={formData} updateData={updateData} />;
-            case 'location': return <LocationShootDateStep data={formData} updateData={updateData} />;
-            case 'deliverables': return <DeliverablesStep data={formData} updateData={updateData} />;
-            case 'shotlist': return <ShotListStep data={formData} updateData={updateData} />;
-            case 'callsheet': return <CallSheetStep data={formData} updateData={updateData} />;
+            case 'contact': return <ContactStep data={formData} updateData={updateFormData} />;
+            case 'location': return <LocationShootDateStep data={formData} updateData={updateFormData} />;
+            case 'deliverables': return <DeliverablesStep data={formData} updateData={updateFormData} />;
+            case 'shotlist': return <ShotListStep data={formData} updateData={updateFormData} />;
+            case 'callsheet': return <CallSheetStep data={formData} updateData={updateFormData} />;
             case 'review': return <ReviewStep data={formData} scriptsLoaded={scriptsLoaded} />;
             default: return <div>Loading...</div>;
         }
