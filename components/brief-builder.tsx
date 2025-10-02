@@ -396,7 +396,7 @@ const ProjectDetailsStep = ({ data, updateData }: StepProps) => {
                     const objMatch = cleaned.match(/Objectives?:([\s\S]*)/i);
                     if (oMatch && oMatch[1]) updateData('overview', oMatch[1].trim());
                     if (objMatch && objMatch[1]) {
-                        const lines = objMatch[1].split(/\r?\n/).map(l => l.replace(/^[-*\s]+/, '').trim()).filter(Boolean);
+                        const lines = objMatch[1].split(/\r?\n/).map((l: string) => l.replace(/^[-*\s]+/, '').trim()).filter(Boolean);
                         if (lines.length) updateData('objectives', '• ' + lines.join('\n• '));
                     }
                 }
@@ -1227,74 +1227,92 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
 
         (async () => {
             try {
-                // Prepare basic HTML summary from the brief content
                 const htmlContent = document.getElementById('brief-content-for-pdf')?.outerHTML || JSON.stringify(data, null, 2);
-
                 const resp = await fetch('/api/email', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ recipients, subject: `Brief: ${data.projectName || 'Untitled'}`, html: htmlContent }),
                 });
+                const json = await resp.json();
+                if (!resp.ok) {
+                    console.error('Email send failed:', json);
+                    alert(`Failed to send email: ${json?.error || resp.statusText}`);
+                } else {
+                    alert('Email sent successfully');
 
-                const json =
-                    <div className="space-y-6">
-                      {(data.projectName || data.projectType || data.budget || data.overview || data.objectives || data.audience) && (
-                        <div>
-                          <h3 className="text-lg font-semibold text-gray-800 mb-2">Project Details</h3>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-700">
+                    setEmailModalOpen(false);
+                    setAdditionalRecipients('');
+                }
+            } catch (err) {
+                console.error('Error sending email:', err);
+                alert('Failed to send email. See console for details.');
+            } finally {
+                setIsSending(false);
+            }
+        })();
+    };
+
+    const handleCloseModal = () => {
+        setEmailModalOpen(false);
+        setShareModalOpen(false);
+    };
+
+    return (
+        <>
+            <div className="space-y-6">
+                <h2 className="text-2xl font-bold text-gray-800">Review Your Brief</h2>
+                <p className="text-gray-600">Double-check the information below and choose how to proceed.</p>
+                
+                {/* Brief content summary */}
+                <div id="brief-content-for-pdf" className="space-y-4">
+                    <div>
+                        <h3 className="text-lg font-semibold text-gray-800">Project Details</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
                             {data.projectName && <div><span className="font-medium">Project Name:</span> {data.projectName}</div>}
                             {data.projectType && <div><span className="font-medium">Project Type:</span> {data.projectType}</div>}
                             {data.budget && <div><span className="font-medium">Budget:</span> {data.budget}</div>}
-                          </div>
-                          {data.overview && <p className="mt-2 text-sm text-gray-700"><span className="font-medium">Overview:</span> {data.overview}</p>}
-                          {data.objectives && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Objectives:</span> {data.objectives}</p>}
-                          {data.audience && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Audience:</span> {data.audience}</p>}
                         </div>
-                      )}
+                        {data.overview && <p className="mt-2 text-sm text-gray-700"><span className="font-medium">Overview:</span> {data.overview}</p>}
+                        {data.objectives && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Objectives:</span> {data.objectives}</p>}
+                        {data.audience && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Audience:</span> {data.audience}</p>}
+                    </div>
 
-                      {(data.clientName || data.clientCompany || data.clientEmail || data.clientPhone) && (
-                        <div>
-                          <h3 className="text-lg font-semibold text-gray-800 mb-2">Contact</h3>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-700">
+                    <div>
+                        <h3 className="text-lg font-semibold text-gray-800">Contact Information</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
                             {data.clientName && <div><span className="font-medium">Name:</span> {data.clientName}</div>}
                             {data.clientCompany && <div><span className="font-medium">Company:</span> {data.clientCompany}</div>}
                             {data.clientEmail && <div><span className="font-medium">Email:</span> {data.clientEmail}</div>}
                             {data.clientPhone && <div><span className="font-medium">Phone:</span> {data.clientPhone}</div>}
-                          </div>
                         </div>
-                      )}
+                    </div>
 
-                      {(data.shootDates || data.shootStatus || data.location) && (
-                        <div>
-                          <h3 className="text-lg font-semibold text-gray-800 mb-2">Dates & Location</h3>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-700">
+                    <div>
+                        <h3 className="text-lg font-semibold text-gray-800">Shoot Dates & Location</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
                             {data.shootDates && <div><span className="font-medium">Dates:</span> {data.shootDates}</div>}
                             {data.shootStatus && <div><span className="font-medium">Status:</span> {data.shootStatus}</div>}
-                          </div>
-                          {data.location && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Location:</span> {data.location}</p>}
                         </div>
-                      )}
+                        {data.location && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Location:</span> {data.location}</p>}
+                    </div>
 
-                      {(data.moodboardLink || (data.moodboardFiles && data.moodboardFiles.length)) && (
-                        <div>
-                          <h3 className="text-lg font-semibold text-gray-800 mb-2">Moodboard</h3>
-                          {data.moodboardLink && <div className="text-sm text-blue-700 underline break-all">{data.moodboardLink}</div>}
-                          {data.moodboardFiles && data.moodboardFiles.length > 0 && (
+                    <div>
+                        <h3 className="text-lg font-semibold text-gray-800">Moodboard</h3>
+                        {data.moodboardLink && <div className="text-sm text-blue-700 underline break-all">{data.moodboardLink}</div>}
+                        {data.moodboardFiles && data.moodboardFiles.length > 0 && (
                             <div className="mt-2 text-sm text-gray-700">{data.moodboardFiles.map(f => f.name).join(', ')}</div>
-                          )}
-                        </div>
-                      )}
+                        )}
+                    </div>
 
-                      {(data.deliverables?.length || data.fileTypes?.length || data.usageRights?.length || data.socialPlatforms?.length) && (
-                        <div>
-                          <h3 className="text-lg font-semibold text-gray-800 mb-2">Deliverables & Usage</h3>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-700">
+                    <div>
+                        <h3 className="text-lg font-semibold text-gray-800">Deliverables & Usage</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
                             {data.deliverables?.length ? <div><span className="font-medium">Deliverables:</span> {data.deliverables.join(', ')}</div> : null}
                             {data.fileTypes?.length ? <div><span className="font-medium">File Types:</span> {data.fileTypes.join(', ')}</div> : null}
                             {data.usageRights?.length ? <div><span className="font-medium">Usage Rights:</span> {data.usageRights.join(', ')}</div> : null}
                             {data.socialPlatforms?.length ? <div><span className="font-medium">Social Platforms:</span> {data.socialPlatforms.join(', ')}</div> : null}
-                          </div>
-                          {data.budgetEstimate && (
+                        </div>
+                        {data.budgetEstimate && (
                             <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-md">
                               <h4 className="font-semibold text-gray-800 mb-2">Estimated Budget</h4>
                               <div className="text-sm text-gray-700 space-y-1">
@@ -1304,11 +1322,10 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
                                 <div className="flex justify-between font-bold pt-2 border-t"><span>Total</span><span>{new Intl.NumberFormat(undefined, { style: 'currency', currency: data.currency || 'USD' }).format(data.budgetEstimate.total)}</span></div>
                               </div>
                             </div>
-                          )}
-                        </div>
-                      )}
+                        )}
+                    </div>
 
-                      {data.shotList?.length ? (
+                    {data.shotList?.length ? (
                         <div>
                           <h3 className="text-lg font-semibold text-gray-800 mb-2">Shot List</h3>
                           <div className="space-y-2">
@@ -1359,17 +1376,74 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
                     <button onClick={() => setEmailModalOpen(true)} className="w-full md:w-auto px-4 py-2 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 transition-colors shadow-sm">Email Brief</button>
                 </div>
             </div>
-            <style>
-            {`
-              @keyframes fade-in {
-                from { opacity: 0; transform: translateY(10px); }
-                to { opacity: 1; transform: translateY(0); }
-              }
-              .animate-fade-in {
-                animation: fade-in 0.5s ease-out forwards;
-              }
-            `}
-            </style>
+
+            {/* Email Modal */}
+            {isEmailModalOpen && (
+                <Modal isOpen={isEmailModalOpen} onClose={() => setEmailModalOpen(false)} title="Send Brief via Email">
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Recipients</label>
+                            <input
+                                type="text"
+                                value={additionalRecipients}
+                                onChange={(e) => setAdditionalRecipients(e.target.value)}
+                                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                placeholder="Enter email addresses, separated by commas"
+                            />
+                            <div className="flex items-center mt-2">
+                                <input
+                                    id="send-to-self"
+                                    type="checkbox"
+                                    checked={includeSelf}
+                                    onChange={(e) => setIncludeSelf(e.target.checked)}
+                                    className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                />
+                                <label htmlFor="send-to-self" className="ml-2 block text-sm text-gray-900">
+                                    Send a copy to my email ({data.clientEmail})
+                                </label>
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-3">
+                            <button onClick={() => setEmailModalOpen(false)} className="px-4 py-2 bg-gray-200 text-gray-700 font-semibold rounded-md hover:bg-gray-300 transition-colors">
+                                Cancel
+                            </button>
+                            <button onClick={handleSendEmail} disabled={isSending} className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                                {isSending ? 'Sending...' : 'Send Email'}
+                            </button>
+                        </div>
+                    </div>
+                </Modal>
+            )}
+
+            {/* Share Modal */}
+            {isShareModalOpen && (
+                <Modal isOpen={isShareModalOpen} onClose={() => setShareModalOpen(false)} title="Share Your Brief">
+                    <div className="space-y-4">
+                        <p className="text-gray-700 text-sm">
+                            Share this link with anyone you want to collaborate with. They will be able to view and edit the brief.
+                        </p>
+                        <div className="relative">
+                            <input
+                                type="text"
+                                value={shareLink}
+                                readOnly
+                                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                            />
+                            <button
+                                onClick={copyToClipboard}
+                                className="absolute right-2 top-2 px-3 py-1.5 bg-indigo-600 text-white text-sm font-semibold rounded-md hover:bg-indigo-700 transition-colors"
+                            >
+                                Copy Link
+                            </button>
+                        </div>
+                        <div className="flex justify-end">
+                            <button onClick={() => setShareModalOpen(false)} className="px-4 py-2 bg-gray-200 text-gray-700 font-semibold rounded-md hover:bg-gray-300 transition-colors">
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </Modal>
+            )}
         </>
     );
 };
