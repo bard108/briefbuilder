@@ -35,7 +35,7 @@ export const ClientInfoStep = ({ data, updateData, showErrors = false }: ClientI
             onBlur={() => setTouchedName(true)}
             placeholder="Enter your name"
             aria-invalid={showNameError}
-            className={`w-full p-3 border rounded-lg shadow-sm focus:ring-2 focus:border-blue-500 transition ${showNameError ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-blue-500'}`}
+            className={`w-full p-3 border rounded-lg shadow-sm focus:ring-2 focus:border-blue-500 transition text-gray-900 placeholder-gray-400 ${showNameError ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-blue-500'}`}
           />
           {showNameError && (
             <p className="mt-1 text-sm text-red-600">Please enter your name.</p>
@@ -51,7 +51,7 @@ export const ClientInfoStep = ({ data, updateData, showErrors = false }: ClientI
             onBlur={() => setTouchedEmail(true)}
             placeholder="Enter your email"
             aria-invalid={showEmailError}
-            className={`w-full p-3 border rounded-lg shadow-sm focus:ring-2 focus:border-blue-500 transition ${showEmailError ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-blue-500'}`}
+            className={`w-full p-3 border rounded-lg shadow-sm focus:ring-2 focus:border-blue-500 transition text-gray-900 placeholder-gray-400 ${showEmailError ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-blue-500'}`}
           />
           {showEmailError && (
             <p className="mt-1 text-sm text-red-600">Please enter your email.</p>

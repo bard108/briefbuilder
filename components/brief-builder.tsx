@@ -1244,87 +1244,127 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
                         <div className="text-xs text-gray-500">Created by {data.clientName || data.userRole || 'Unknown'} • {new Date().toLocaleDateString()}</div>
                     </div>
                     <div className="h-px bg-gray-200" />
-                    {(Object.keys(data) as Array<keyof FormData>).map((key) => {
-                        const value = data[key];
-                        if (!value || (Array.isArray(value) && value.length === 0)) return null;
-                        
-                        let content;
-                        if (key === 'crew' && Array.isArray(value)) {
-                            content = (
-                                <div className="mt-2 space-y-3">
-                                    {(value as CrewMember[]).map((member) => (
-                                        <div key={member.id} className="p-3 bg-gray-50 border border-gray-200 rounded-md">
-                                            <p className="font-semibold text-gray-800">{member.name || 'No Name'} - <span className="font-normal text-gray-600">{member.role || 'No Role'}</span></p>
-                                            <p className="text-sm text-gray-600">Call: {member.callTime || 'TBD'} | Contact: {member.contact || 'N/A'}</p>
-                                        </div>
-                                    ))}
-                                </div>
-                            );
-                        } else if (key === 'shotList' && Array.isArray(value)) {
-                            content = (
-                                <div className="mt-2 space-y-3">
-                                    {(value as Shot[]).map((shot, index) => (
-                                        <div key={shot.id} className="p-3 bg-gray-50 border border-gray-200 rounded-md">
-                                            <p className="font-semibold text-gray-800">Shot #{index + 1}: {shot.priority && <span className="ml-2 text-xs font-bold text-indigo-600 bg-indigo-100 px-2 py-1 rounded-full">MUST-HAVE</span>}</p>
-                                            <p className="mt-1 text-sm text-gray-700">{shot.description}</p>
-                                            <p className="text-xs text-gray-500">{shot.shotType} | {shot.angle} {shot.notes && `| ${shot.notes}`}</p>
-                                        </div>
-                                    ))}
-                                </div>
-                            );
-                        } else if (key === 'budgetEstimate') {
-                            const estimate = value as { total: number; breakdown: Record<string, number> };
-                            content = (
-                                <div className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-md">
-                                    <h4 className="font-semibold text-gray-800 mb-2">Estimated Budget Breakdown</h4>
-                                    <div className="text-sm text-gray-700 space-y-1">
-                                      {Object.entries(estimate.breakdown).map(([k,v]) => (
-                                        <div key={k} className="flex justify-between"><span>{k}</span><span>{new Intl.NumberFormat(undefined, { style: 'currency', currency: data.currency || 'USD' }).format(v)}</span></div>
-                                      ))}
-                                      <div className="flex justify-between font-bold pt-2 border-t"><span>Total</span><span>{new Intl.NumberFormat(undefined, { style: 'currency', currency: data.currency || 'USD' }).format(estimate.total)}</span></div>
-                                    </div>
-                                </div>
-                            );
-                        } else {
-                            content = (
-                                <div className="mt-2">
-                                    <span className="block text-sm font-medium text-gray-700">{key}</span>
-                                    <span className="block text-sm text-gray-600">{JSON.stringify(value, null, 2)}</span>
-                                </div>
-                            );
-                        }
+                    {/* Structured sections - render only when filled */}
+                    <div className="space-y-6">
+                      {(data.projectName || data.projectType || data.budget || data.overview || data.objectives || data.audience) && (
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-800 mb-2">Project Details</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-700">
+                            {data.projectName && <div><span className="font-medium">Project Name:</span> {data.projectName}</div>}
+                            {data.projectType && <div><span className="font-medium">Project Type:</span> {data.projectType}</div>}
+                            {data.budget && <div><span className="font-medium">Budget:</span> {data.budget}</div>}
+                          </div>
+                          {data.overview && <p className="mt-2 text-sm text-gray-700"><span className="font-medium">Overview:</span> {data.overview}</p>}
+                          {data.objectives && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Objectives:</span> {data.objectives}</p>}
+                          {data.audience && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Audience:</span> {data.audience}</p>}
+                        </div>
+                      )}
 
-                        return (
-                            <div key={key} className="py-4 border-b last:border-0">
-                                <h3 className="text-lg font-semibold text-gray-800 mb-2 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</h3>
-                                {content}
+                      {(data.clientName || data.clientCompany || data.clientEmail || data.clientPhone) && (
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-800 mb-2">Contact</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-700">
+                            {data.clientName && <div><span className="font-medium">Name:</span> {data.clientName}</div>}
+                            {data.clientCompany && <div><span className="font-medium">Company:</span> {data.clientCompany}</div>}
+                            {data.clientEmail && <div><span className="font-medium">Email:</span> {data.clientEmail}</div>}
+                            {data.clientPhone && <div><span className="font-medium">Phone:</span> {data.clientPhone}</div>}
+                          </div>
+                        </div>
+                      )}
+
+                      {(data.shootDates || data.shootStatus || data.location) && (
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-800 mb-2">Dates & Location</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-700">
+                            {data.shootDates && <div><span className="font-medium">Dates:</span> {data.shootDates}</div>}
+                            {data.shootStatus && <div><span className="font-medium">Status:</span> {data.shootStatus}</div>}
+                          </div>
+                          {data.location && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Location:</span> {data.location}</p>}
+                        </div>
+                      )}
+
+                      {(data.moodboardLink || (data.moodboardFiles && data.moodboardFiles.length)) && (
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-800 mb-2">Moodboard</h3>
+                          {data.moodboardLink && <div className="text-sm text-blue-700 underline break-all">{data.moodboardLink}</div>}
+                          {data.moodboardFiles && data.moodboardFiles.length > 0 && (
+                            <div className="mt-2 text-sm text-gray-700">{data.moodboardFiles.map(f => f.name).join(', ')}</div>
+                          )}
+                        </div>
+                      )}
+
+                      {(data.deliverables?.length || data.fileTypes?.length || data.usageRights?.length || data.socialPlatforms?.length) && (
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-800 mb-2">Deliverables & Usage</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-700">
+                            {data.deliverables?.length ? <div><span className="font-medium">Deliverables:</span> {data.deliverables.join(', ')}</div> : null}
+                            {data.fileTypes?.length ? <div><span className="font-medium">File Types:</span> {data.fileTypes.join(', ')}</div> : null}
+                            {data.usageRights?.length ? <div><span className="font-medium">Usage Rights:</span> {data.usageRights.join(', ')}</div> : null}
+                            {data.socialPlatforms?.length ? <div><span className="font-medium">Social Platforms:</span> {data.socialPlatforms.join(', ')}</div> : null}
+                          </div>
+                          {data.budgetEstimate && (
+                            <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-md">
+                              <h4 className="font-semibold text-gray-800 mb-2">Estimated Budget</h4>
+                              <div className="text-sm text-gray-700 space-y-1">
+                                {Object.entries(data.budgetEstimate.breakdown).map(([k,v]) => (
+                                  <div key={k} className="flex justify-between"><span>{k}</span><span>{new Intl.NumberFormat(undefined, { style: 'currency', currency: data.currency || 'USD' }).format(v)}</span></div>
+                                ))}
+                                <div className="flex justify-between font-bold pt-2 border-t"><span>Total</span><span>{new Intl.NumberFormat(undefined, { style: 'currency', currency: data.currency || 'USD' }).format(data.budgetEstimate.total)}</span></div>
+                              </div>
                             </div>
-                        );
-                    })}
+                          )}
+                        </div>
+                      )}
+
+                      {data.shotList?.length ? (
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-800 mb-2">Shot List</h3>
+                          <div className="space-y-2">
+                            {data.shotList.map((shot, i) => (
+                              <div key={shot.id} className="p-3 bg-gray-50 border border-gray-200 rounded-md">
+                                <div className="flex items-center justify-between">
+                                  <p className="font-semibold text-gray-800">Shot #{i + 1}</p>
+                                  {shot.priority && <span className="ml-2 text-xs font-bold text-indigo-600 bg-indigo-100 px-2 py-1 rounded-full">MUST-HAVE</span>}
+                                </div>
+                                <p className="mt-1 text-sm text-gray-700">{shot.description}</p>
+                                <p className="text-xs text-gray-500">{shot.shotType} | {shot.angle} {shot.notes && `| ${shot.notes}`}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {data.crew?.length ? (
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-800 mb-2">Crew & Talent</h3>
+                          <div className="space-y-2">
+                            {data.crew.map(member => (
+                              <div key={member.id} className="p-3 bg-gray-50 border border-gray-200 rounded-md">
+                                <p className="font-semibold text-gray-800">{member.name || 'No Name'} <span className="font-normal text-gray-600">— {member.role || 'No Role'}</span></p>
+                                <p className="text-sm text-gray-600">Call: {member.callTime || 'TBD'} | Contact: {member.contact || 'N/A'}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {(data.schedule || data.emergencyContact || data.nearestHospital || data.notes) && (
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-800 mb-2">Logistics</h3>
+                          {data.schedule && <p className="text-sm text-gray-700"><span className="font-medium">Schedule:</span> {data.schedule}</p>}
+                          {data.emergencyContact && <p className="text-sm text-gray-700"><span className="font-medium">Emergency Contact:</span> {data.emergencyContact}</p>}
+                          {data.nearestHospital && <p className="text-sm text-gray-700"><span className="font-medium">Nearest Hospital:</span> {data.nearestHospital}</p>}
+                          {data.notes && <p className="text-sm text-gray-700"><span className="font-medium">Notes:</span> {data.notes}</p>}
+                        </div>
+                      )}
+                    </div>
                 </div>
                 
                 {/* Action buttons */}
-                <div className="flex flex-col md:flex-row md:justify-between md:items-center mt-6">
-                    <div className="flex gap-4 mb-4 md:mb-0">
-                        <button onClick={handleDownloadPdf} className="flex-1 px-4 py-2 bg-green-600 text-white font-semibold rounded-md hover:bg-green-700 transition-colors shadow-sm">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 -ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v8m0 0l-2-2m2 2l2-2m-6 2a9 9 0 11-9-9 9 9 0 019 9z" />
-                            </svg>
-                            Download PDF
-                        </button>
-                        <button onClick={handleShare} className="flex-1 px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 transition-colors shadow-sm">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 -ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 8a6 6 0 10-8 0 6 6 0 008 0zM12 14v7m0 0l-2-2m2 2l2-2m-6 2a9 9 0 119-9 9 9 0 01-9 9z" />
-                            </svg>
-                            Share Brief
-                        </button>
-                    </div>
-                    <button onClick={() => setEmailModalOpen(true)} className="w-full md:w-auto px-4 py-2 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 transition-colors shadow-sm">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 -ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8v13a2 2 0 002 2h14a2 2 0 002-2V8m-8 4h4m-4 0l-2 2m2-2l2-2m-6 2a9 9 0 119-9 9 9 0 01-9 9z" />
-                        </svg>
-                        Email Brief
-                    </button>
+                <div className="flex flex-col md:flex-row md:justify-between md:items-center mt-6 gap-4">
+                    <button onClick={handleShare} className="w-full md:w-auto px-4 py-2 bg-gray-100 text-gray-800 font-semibold rounded-md hover:bg-gray-200 transition-colors">Share Link</button>
+                    <button onClick={handleDownloadPdf} className="w-full md:w-auto px-4 py-2 bg-gray-100 text-gray-800 font-semibold rounded-md hover:bg-gray-200 transition-colors">Download PDF</button>
+                    <button onClick={() => setEmailModalOpen(true)} className="w-full md:w-auto px-4 py-2 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 transition-colors shadow-sm">Email Brief</button>
                 </div>
             </div>
             <style>
@@ -1523,7 +1563,7 @@ export default function BriefBuilder() {
                             </div>
                             <div>
                                {isOptional && (
-                                    <button onClick={nextStep} className="px-6 py-2 mr-4 bg-white text-indigo-700 border border-gray-300 font-semibold rounded-md hover:bg-gray-50 transition-colors">Skip</button>
+                                    <button onClick={nextStep} className="px-6 py-2 mr-4 bg-white text-indigo-700 border border-gray-300 font-semibold rounded-md hover:bg-indigo-50 transition-colors">Skip</button>
                                )}
                                <button onClick={nextStep} disabled={isNextDisabled} className="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
                             </div>
