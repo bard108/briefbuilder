@@ -853,19 +853,132 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
     const handleDownloadPdf = async () => {
         try {
             const input = briefContentRef.current as HTMLElement | null;
-            if (!input) { alert('Content not ready for PDF generation.'); return; }
-            let jsPDFConstructor: any = null; let html2canvasFunc: any = null;
-            if (window.jspdf && window.html2canvas) { jsPDFConstructor = window.jspdf.jsPDF || window.jspdf; html2canvasFunc = window.html2canvas; }
-            else { const imports: any = await Promise.all([import('jspdf'), import('html2canvas')]); jsPDFConstructor = (imports[0] && (imports[0].jsPDF || imports[0])) || null; html2canvasFunc = (imports[1] && (imports[1].default || imports[1])) || null; }
-            if (!jsPDFConstructor || !html2canvasFunc) { alert('PDF generation libraries are not available.'); return; }
-            const canvas = await html2canvasFunc(input, { scale: 2 });
+            if (!input) {
+                alert('Content not ready for PDF generation.');
+                return;
+            }
+
+            let jsPDFConstructor: any = null;
+            let html2canvasFunc: any = null;
+
+            if (window.jspdf && window.html2canvas) {
+                jsPDFConstructor = window.jspdf.jsPDF || window.jspdf;
+                html2canvasFunc = window.html2canvas;
+            } else {
+                const imports: any = await Promise.all([import('jspdf'), import('html2canvas')]);
+                jsPDFConstructor = (imports[0] && (imports[0].jsPDF || imports[0])) || null;
+                html2canvasFunc = (imports[1] && (imports[1].default || imports[1])) || null;
+            }
+
+            if (!jsPDFConstructor || !html2canvasFunc) {
+                alert('PDF generation libraries are not available.');
+                return;
+            }
+
+            let canvas: HTMLCanvasElement | null = null;
+            try {
+                // Try rendering the actual DOM with safe options
+                canvas = await html2canvasFunc(input, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff' });
+            } catch (e) {
+                console.warn('Primary html2canvas render failed, falling back to text-only snapshot.', e);
+            }
+
+            if (!canvas) {
+                // Fallback: build a minimal, safe text snapshot
+                const safe = document.createElement('div');
+                safe.style.position = 'absolute';
+                safe.style.left = '-9999px';
+                safe.style.top = '0';
+                safe.style.width = (input.offsetWidth || 800) + 'px';
+                safe.style.padding = '28px';
+                safe.style.background = '#ffffff';
+                safe.style.color = '#0f172a';
+                safe.style.fontFamily = 'Inter, Arial, Helvetica, sans-serif';
+                safe.style.fontSize = '13px';
+                safe.style.lineHeight = '1.45';
+                safe.style.whiteSpace = 'pre-wrap';
+
+                const title = document.createElement('div');
+                title.style.display = 'flex';
+                title.style.justifyContent = 'space-between';
+                title.style.alignItems = 'baseline';
+                title.style.marginBottom = '18px';
+
+                const h = document.createElement('h1');
+                h.textContent = data.projectName || 'Untitled Brief';
+                h.style.fontSize = '20px';
+                h.style.margin = '0';
+                h.style.fontWeight = '700';
+                h.style.color = '#0b1220';
+
+                const meta = document.createElement('div');
+                meta.style.fontSize = '12px';
+                meta.style.color = '#475569';
+                const creator = data.clientName || (data.userRole ? `${data.userRole}` : 'Unknown');
+                const created = new Date().toLocaleString();
+                meta.textContent = `Created by ${creator} • ${created}`;
+
+                title.appendChild(h);
+                title.appendChild(meta);
+
+                const content = document.createElement('div');
+                content.style.border = '1px solid #e6edf3';
+                content.style.padding = '16px';
+                content.style.borderRadius = '6px';
+                content.style.background = '#ffffff';
+                content.style.color = '#0b1220';
+
+                const addSection = (label: string, text: string | null | undefined) => {
+                    if (!text) return;
+                    const wrap = document.createElement('div');
+                    wrap.style.marginBottom = '12px';
+                    const lh = document.createElement('div');
+                    lh.textContent = label;
+                    lh.style.fontWeight = '600';
+                    lh.style.marginBottom = '6px';
+                    lh.style.color = '#0b1220';
+                    const p = document.createElement('div');
+                    p.textContent = text;
+                    p.style.whiteSpace = 'pre-wrap';
+                    wrap.appendChild(lh);
+                    wrap.appendChild(p);
+                    content.appendChild(wrap);
+                };
+
+                addSection('Project Name', data.projectName);
+                addSection('Overview', data.overview);
+                addSection('Objectives', data.objectives);
+                addSection('Dates', data.shootDates);
+                addSection('Location', data.location);
+                if (Array.isArray(data.deliverables) && data.deliverables.length) addSection('Deliverables', data.deliverables.join(', '));
+                if (Array.isArray(data.shotList) && data.shotList.length) addSection('Shot List', data.shotList.map((s, i) => `${i + 1}. ${s.description}`).join('\n'));
+                if (data.budgetEstimate) addSection('Estimated Budget', `Total: ${new Intl.NumberFormat(undefined, { style: 'currency', currency: data.currency || 'USD' }).format(data.budgetEstimate.total)}`);
+
+                safe.appendChild(title);
+                safe.appendChild(content);
+                document.body.appendChild(safe);
+                try {
+                    canvas = await html2canvasFunc(safe, { scale: 2, backgroundColor: '#ffffff' });
+                } finally {
+                    try { document.body.removeChild(safe); } catch {}
+                }
+            }
+
+            if (!canvas) {
+                throw new Error('Failed to render canvas for PDF generation');
+            }
+
             const imgData = canvas.toDataURL('image/png');
             const PDFClass = jsPDFConstructor.jsPDF ? jsPDFConstructor.jsPDF : jsPDFConstructor;
             const pdf = new PDFClass();
+
             const pdfWidth = pdf.internal.pageSize.getWidth();
             const pdfHeight = pdf.internal.pageSize.getHeight();
             const ratio = canvas.width / canvas.height;
-            let finalWidth = pdfWidth; let finalHeight = finalWidth / ratio; if (finalHeight > pdfHeight) { finalHeight = pdfHeight; finalWidth = finalHeight * ratio; }
+            let finalWidth = pdfWidth;
+            let finalHeight = finalWidth / ratio;
+            if (finalHeight > pdfHeight) { finalHeight = pdfHeight; finalWidth = finalHeight * ratio; }
+
             pdf.addImage(imgData, 'PNG', 0, 0, finalWidth, finalHeight);
             pdf.save(`brief-${data.projectName?.replace(/\s+/g, '-') || 'download'}.pdf`);
         } catch (err) {
