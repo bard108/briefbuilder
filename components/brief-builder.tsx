@@ -690,7 +690,166 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
                 return;
             }
 
-            const canvas: HTMLCanvasElement = await html2canvasFunc(input, { scale: 2 });
+            // Clone the node and inline computed color-related styles to avoid html2canvas parsing unsupported CSS functions (e.g., oklch)
+            const clone = input.cloneNode(true) as HTMLElement;
+            // Walk originals and clones in parallel and copy computed color styles
+            const originals = Array.from(input.querySelectorAll('*')) as HTMLElement[];
+            const clones = Array.from(clone.querySelectorAll('*')) as HTMLElement[];
+            // also include the root element
+            originals.unshift(input as HTMLElement);
+            clones.unshift(clone as HTMLElement);
+
+            const propsToCopy = ['color','backgroundColor','borderColor','fill','stroke','boxShadow','backgroundImage'];
+
+            const resolveToComputed = (value: string, property: string) => {
+                try {
+                    // try to resolve complex color functions (oklch, color-mix) or CSS vars by
+                    // applying them to a temporary element and reading the computed value.
+                    const tmp = document.createElement('div');
+                    tmp.style.position = 'absolute';
+                    tmp.style.left = '-9999px';
+                    // set the property (use camelCase for style access)
+                    (tmp.style as any)[property] = value;
+                    document.body.appendChild(tmp);
+                    const resolved = (window.getComputedStyle(tmp) as any)[property];
+                    document.body.removeChild(tmp);
+                    return resolved || value;
+                } catch (e) {
+                    return value;
+                }
+            };
+
+            originals.forEach((origEl, i) => {
+                const clonedEl = clones[i];
+                if (!clonedEl) return;
+                const style = window.getComputedStyle(origEl);
+                propsToCopy.forEach((prop) => {
+                    try {
+                        let val = (style as any)[prop] as string;
+                        if (val && val !== 'transparent' && val !== 'none') {
+                            // If the value references CSS variables or contains oklch/color-mix, try to resolve
+                            if (val.includes('var(') || val.includes('oklch(') || val.includes('color-mix(')) {
+                                const resolved = resolveToComputed(val, prop);
+                                if (resolved) val = resolved;
+                            }
+
+                            // convert camelCase to hyphen-case for setting style property
+                            const cssProp = prop.replace(/[A-Z]/g, m => '-' + m.toLowerCase());
+                            clonedEl.style.setProperty(cssProp, val as string, 'important');
+                        }
+                    } catch (e) {
+                        // ignore
+                    }
+                });
+            });
+
+            // Resolve any CSS custom properties (variables) used by the clone that contain unsupported functions like oklch()
+            try {
+                const cssVars = new Set<string>();
+                const allStyles = window.getComputedStyle(document.documentElement).cssText || '';
+                // Collect variables that have 'oklch' in the global computed style
+                const varRegex = /--[\w-]+/g;
+                const matches = allStyles.match(varRegex) || [];
+                matches.forEach(v => {
+                    const val = window.getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+                    if (val && val.includes('oklch(')) cssVars.add(v);
+                });
+
+                // Also search inline styles of the clone for var(--*) usages
+                const cloneCssText = clone.outerHTML;
+                const varUsageRegex = /var\((--[\w-]+)\)/g;
+                let m;
+                while ((m = varUsageRegex.exec(cloneCssText)) !== null) {
+                    cssVars.add(m[1]);
+                }
+
+                // Inline resolved values for those variables on the clone root
+                cssVars.forEach(v => {
+                    const resolved = window.getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+                    if (resolved) clone.style.setProperty(v, resolved);
+                });
+            } catch (e) {
+                // ignore
+            }
+
+            // place clone offscreen so images/fonts can load
+            // Also apply a minimal "print" fallback stylesheet to the clone that avoids
+            // complex CSS functions (oklch) and removes backgrounds/gradients/shadows.
+            const safePrintCss = `
+              * { color: inherit !important; background: transparent !important; background-image: none !important; box-shadow: none !important; filter: none !important; }
+              body, html, #root { background: #ffffff !important; }
+            `;
+
+            const styleEl = document.createElement('style');
+            styleEl.setAttribute('data-briefprint', '1');
+            styleEl.appendChild(document.createTextNode(safePrintCss));
+            clone.insertBefore(styleEl, clone.firstChild);
+
+            // Ensure any remaining CSS custom properties on the clone root are resolved to
+            // concrete values (attempt again, after injecting safe CSS) to remove oklch values.
+            try {
+                const allProps = window.getComputedStyle(clone);
+                for (let i = 0; i < allProps.length; i++) {
+                    const name = allProps[i];
+                    if (name.startsWith('--')) {
+                        const val = window.getComputedStyle(clone).getPropertyValue(name).trim();
+                        if (val && !val.includes('var(') && !val.includes('oklch(')) {
+                            clone.style.setProperty(name, val);
+                        } else if (val && val.includes('oklch(')) {
+                            // If it still contains oklch, try to read from documentElement and resolve to computed rgb
+                            const resolved = window.getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+                            if (resolved && !resolved.includes('oklch(')) clone.style.setProperty(name, resolved);
+                        }
+                    }
+                }
+            } catch (e) {
+                // ignore resolution issues
+            }
+
+            clone.style.position = 'absolute';
+            clone.style.left = '-9999px';
+            clone.style.top = '0';
+            document.body.appendChild(clone);
+
+            let canvas: HTMLCanvasElement | null = null;
+            try {
+                canvas = await html2canvasFunc(clone, { scale: 2 });
+                // remove clone after rendering
+                document.body.removeChild(clone);
+            } catch (e: any) {
+                console.warn('html2canvas primary render failed, attempting text-only fallback', e);
+                // Ensure clone is removed
+                try { document.body.removeChild(clone); } catch (_) {}
+
+                // If the error mentions unsupported color function (oklch) or similar, create a
+                // simplified, safe snapshot containing only the textual content and basic layout.
+                const safeSnapshot = document.createElement('div');
+                safeSnapshot.style.position = 'absolute';
+                safeSnapshot.style.left = '-9999px';
+                safeSnapshot.style.top = '0';
+                safeSnapshot.style.width = (input.offsetWidth || 800) + 'px';
+                safeSnapshot.style.padding = '24px';
+                safeSnapshot.style.background = '#ffffff';
+                safeSnapshot.style.color = '#111827';
+                safeSnapshot.style.fontFamily = 'Arial, Helvetica, sans-serif';
+                safeSnapshot.style.fontSize = '12px';
+                safeSnapshot.style.lineHeight = '1.4';
+                safeSnapshot.style.whiteSpace = 'pre-wrap';
+
+                // Use textContent to avoid carrying over any styles / variables
+                safeSnapshot.textContent = input.innerText || input.textContent || '';
+                document.body.appendChild(safeSnapshot);
+
+                try {
+                    canvas = await html2canvasFunc(safeSnapshot, { scale: 2 });
+                } catch (e2) {
+                    console.error('Fallback html2canvas render failed', e2);
+                    try { document.body.removeChild(safeSnapshot); } catch (_) {}
+                    throw e2;
+                }
+
+                try { document.body.removeChild(safeSnapshot); } catch (_) {}
+            }
             const imgData = canvas.toDataURL('image/png');
 
             // jsPDF may be exported as a class under jsPDF or as a namespace with jsPDF member
@@ -902,7 +1061,9 @@ export default function BriefBuilder() {
                 setScriptsLoaded(true);
             })
             .catch(error => {
-                console.error("Failed to load PDF generation scripts:", error);
+                console.error("Failed to load PDF generation scripts (CDN). Will use bundled modules as fallback:", error);
+                // Allow the UI to attempt dynamic imports as a fallback
+                setScriptsLoaded(true);
             });
     }, []);
 
