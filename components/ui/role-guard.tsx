@@ -50,12 +50,10 @@ interface RequireRoleProps {
  * </RequireRole>
  */
 export function RequireRole({ roles, children, fallback = null }: RequireRoleProps) {
-  const userRole = useBriefStore((state) => state.userRole);
-  
-  if (!roles.includes(userRole)) {
+  const role = useBriefStore((state) => state.role);
+  if (!role || !roles.includes(role)) {
     return <>{fallback}</>;
   }
-  
   return <>{children}</>;
 }
 
@@ -78,11 +76,10 @@ interface PermissionMessageProps {
 export function PermissionMessage({ permission, feature }: PermissionMessageProps) {
   const roleConfig = useBriefStore((state) => state.getRoleConfig());
   const hasPermission = useBriefStore((state) => state.hasPermission(permission));
-  
   if (hasPermission) {
     return null;
   }
-  
+  const displayName = roleConfig ? roleConfig.displayName : 'your';
   return (
     <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
       <div className="mb-3">
@@ -104,7 +101,7 @@ export function PermissionMessage({ permission, feature }: PermissionMessageProp
         {feature} Not Available
       </h3>
       <p className="text-gray-600 text-sm mb-4">
-        This feature is not available for {roleConfig.displayName} users.
+        This feature is not available for {displayName} users.
       </p>
       <p className="text-xs text-gray-500">
         Available in: Photographer &amp; Producer plans
@@ -122,12 +119,10 @@ interface AdaptiveControlProps {
 }
 
 export function AdaptiveControl({ clientView, proView }: AdaptiveControlProps) {
-  const userRole = useBriefStore((state) => state.userRole);
-  
-  if (userRole === 'Client') {
+  const role = useBriefStore((state) => state.role);
+  if (role === 'Client') {
     return <>{clientView}</>;
   }
-  
   return <>{proView}</>;
 }
 
@@ -136,7 +131,7 @@ export function AdaptiveControl({ clientView, proView }: AdaptiveControlProps) {
  */
 export function RoleBadge() {
   const roleConfig = useBriefStore((state) => state.getRoleConfig());
-  
+  if (!roleConfig) return null;
   return (
     <div 
       className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium"
@@ -161,14 +156,8 @@ interface RoleHelpTextProps {
 }
 
 export function RoleHelpText({ clientText, photographerText, producerText }: RoleHelpTextProps) {
-  const userRole = useBriefStore((state) => state.userRole);
-  
-  const text = {
-    Client: clientText,
-    Photographer: photographerText,
-    Producer: producerText,
-  }[userRole];
-  
+  const role = useBriefStore((state) => state.role);
+  const text = role === 'Client' ? clientText : role === 'Photographer' ? photographerText : role === 'Producer' ? producerText : clientText;
   return (
     <p className="text-sm text-gray-600 mt-1">
       {text}
@@ -181,7 +170,7 @@ export function RoleHelpText({ clientText, photographerText, producerText }: Rol
  */
 export function RoleFeatureList() {
   const roleConfig = useBriefStore((state) => state.getRoleConfig());
-  
+  if (!roleConfig) return null;
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4">
       <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
