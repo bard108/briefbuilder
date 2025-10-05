@@ -1,39 +1,174 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 📸 BriefBuilder
 
-## Getting Started
+**A comprehensive photography brief, shot list, and call sheet builder for photographers, clients, and producers.**
 
-First, run the development server:
+BriefBuilder helps you create professional photography project briefs with intelligent features powered by AI, pre-built templates, and collaborative tools.
 
+## ✨ Features
+
+### 🎯 Core Features
+- **Multi-role support**: Optimized workflows for Clients, Photographers, and Producers
+- **6 Pre-built Templates**: Commercial Product, Corporate Events, Food & Beverage, Fashion, Real Estate, Wedding/Lifestyle
+- **Auto-save**: Never lose your work with automatic draft saving every 30 seconds
+- **Smart Shot Lists**: Drag-and-drop reordering, categorization, time estimates, status tracking
+- **Equipment Management**: Categorized checklists with rental tracking and pack/unpack status
+- **Line-item Budgeting**: Detailed budget builder with multiple currencies
+- **AI-Powered**: Generate ideas, shot lists, schedules, and get expert analysis
+
+### 📤 Export & Sharing
+- **Enhanced PDF**: Professional cover pages, branding, watermarks
+- **Calendar Integration**: iCal and Google Calendar export
+- **Multiple Formats**: JSON, CSV, Markdown
+- **QR Codes**: Generate shareable QR codes for mobile access
+- **Email Delivery**: Send briefs directly to stakeholders
+
+### 🤖 AI Capabilities
+- Brief analysis and improvement suggestions
+- Budget reasonableness checks
+- Shot list generation from project description
+- Shot ideas from reference images (vision AI)
+- Schedule generation from crew and shots
+- Risk assessment
+- Equipment recommendations
+- Terminology explanations for clients
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js 18+ 
+- npm or yarn
+
+### Installation
+
+1. **Clone the repository**
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/bard108/briefbuilder.git
+cd briefbuilder
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. **Install dependencies**
+```bash
+npm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. **Set up environment variables**
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Create a `.env.local` file in the root directory:
 
-## Learn More
+```env
+GEMINI_API_KEY=your_gemini_api_key_here
+RESEND_API_KEY=your_resend_api_key_here
+RESEND_FROM=noreply@yourdomain.com
+```
 
-To learn more about Next.js, take a look at the following resources:
+Get your API keys:
+- **Gemini API**: [https://ai.google.dev/](https://ai.google.dev/)
+- **Resend API**: [https://resend.com/](https://resend.com/)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+4. **Run the development server**
+```bash
+npm run dev
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+5. **Open your browser**
 
-## Deploy on Vercel
+Navigate to [http://localhost:3000](http://localhost:3000)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 📁 Project Structure
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+briefbuilder/
+├── app/                      # Next.js app directory
+│   ├── api/                  # API routes
+│   │   ├── gemini/          # AI integration
+│   │   └── email/           # Email sending
+│   ├── page.tsx             # Home page
+│   └── globals.css          # Global styles
+├── components/              # React components
+│   ├── brief-builder.tsx    # Main application
+│   ├── client-info-step.tsx # Client info form
+│   ├── ui/                  # Reusable UI components
+│   │   ├── sortable-shot-list.tsx
+│   │   ├── template-selector.tsx
+│   │   ├── progress-indicator.tsx
+│   │   ├── equipment-checklist.tsx
+│   │   └── budget-builder.tsx
+│   └── steps/               # Wizard step components
+├── lib/                     # Core library code
+│   ├── stores/              # State management (Zustand)
+│   ├── schemas/             # Data schemas (Zod)
+│   ├── templates/           # Pre-built templates
+│   ├── utils/               # Utility functions
+│   │   ├── pdf-generator.ts
+│   │   ├── calendar-export.ts
+│   │   ├── export-utils.ts
+│   │   └── ai-helpers.ts
+│   └── hooks/               # Custom React hooks
+└── public/                  # Static assets
+```
+
+## 🎨 Using Templates
+
+BriefBuilder includes 6 professionally crafted templates:
+
+1. **Commercial Product Photography** - E-commerce and product marketing
+2. **Corporate Event Coverage** - Conferences, meetings, team events
+3. **Food & Beverage Photography** - Restaurant menus, cookbooks
+4. **Fashion & Editorial** - Fashion campaigns, lookbooks
+5. **Real Estate & Architectural** - Property listings, interiors
+6. **Wedding & Lifestyle** - Weddings, engagements, family portraits
+
+Each template includes:
+- Pre-filled project details
+- Sample shot lists with categories
+- Recommended equipment
+- Suggested crew roles
+- Typical objectives and audience
+
+## 🛠️ Development
+
+### Build for Production
+```bash
+npm run build
+npm start
+```
+
+### Run Tests
+```bash
+npm test
+```
+
+### Linting
+```bash
+npm run lint
+```
+
+## 📚 Documentation
+
+For detailed feature documentation, see [FEATURES.md](./FEATURES.md).
+
+## 🎯 Roadmap
+
+- [x] Core brief builder functionality
+- [x] Multi-role support
+- [x] Template system
+- [x] Auto-save and draft management
+- [x] Enhanced PDF generation
+- [x] AI integration
+- [x] Equipment and budget management
+- [ ] Weather API integration
+- [ ] Multi-user collaboration
+- [ ] Version history
+- [ ] Mobile app
+- [ ] Analytics dashboard
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📄 License
+
+This project is private and proprietary.
 
 ## Environment variables
 

@@ -1,18 +1,22 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { ROLE_STEPS } from '@/lib/config/steps-config';
+import { type UserRole } from '@/lib/config/role-config';
+import { type Step as WizardStep } from '@/lib/config/types';
+import { useBriefStore, useAutoSave, useBeforeUnload } from '@/lib/stores/brief-store';
+import { StartPage } from './start-page';
+import { SortableShotList } from './ui/sortable-shot-list';
+import { TemplateSelector } from './ui/template-selector';
+import { ProgressIndicator } from './ui/progress-indicator';
+import { exportAsJSON, exportAsMarkdown, exportShotListAsCSV } from '@/lib/utils/export-utils';
+import { exportBudgetAsCSV } from '@/lib/utils/export-utils';
+import { downloadICalendar, generateGoogleCalendarUrl } from '@/lib/utils/calendar-export';
 
 import { ClientInfoStep } from './client-info-step';
 
 // --- Type Definitions ---
-interface Shot {
-  id: number;
-  description: string;
-  shotType: string;
-  angle: string;
-  priority: boolean;
-  notes: string;
-}
+import { type Shot } from '@/lib/schemas/brief-schema';
 
 interface CrewMember {
   id: number;
@@ -23,7 +27,7 @@ interface CrewMember {
 }
 
 interface FormData {
-  userRole?: string;
+  userRole?: UserRole;
   projectName?: string;
   budget?: string;
   projectType?: string;
@@ -345,7 +349,9 @@ const CheckboxGroup = ({ legend, options, selectedOptions, onChange }: { legend:
 
 // --- WIZARD STEP COMPONENTS ---
 
-const StartPage = ({ onSelectRole }: { onSelectRole: (role: string) => void }) => (
+// StartPage component moved to separate file
+
+const renderMainContent = ({ onSelectRole }: { onSelectRole: (role: string) => void }) => (
     <div className="bg-gray-100 min-h-screen font-sans p-4 sm:p-6 lg:p-8 flex items-center justify-center">
         <div className="max-w-md w-full text-center bg-white p-10 rounded-xl shadow-lg animate-fade-in">
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Create a New Brief</h1>
@@ -640,6 +646,7 @@ const DeliverablesStep = ({ data, updateData }: StepProps) => {
 
 const ShotListStep = ({ data, updateData }: StepProps) => {
     const [isLoading, setIsLoading] = useState(false);
+    const [showTemplateSelector, setShowTemplateSelector] = useState(false);
     const shotList = data.shotList || [];
 
     const generateShotList = async () => {
@@ -695,38 +702,34 @@ const ShotListStep = ({ data, updateData }: StepProps) => {
                 <h2 className="text-2xl font-bold text-gray-800">
                     {data.userRole === 'Client' ? "Key Shots (Optional)" : "Shot List (Optional)"}
                 </h2>
-                <button onClick={generateShotList} disabled={isLoading} className="flex items-center px-3 py-1.5 border border-indigo-600 text-indigo-600 text-sm font-semibold rounded-md hover:bg-indigo-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-300 transition-colors">
-                    <SparklesIcon className="h-4 w-4 mr-2"/>
-                    {isLoading ? 'Generating...' : (data.userRole === 'Client' ? '✨ Suggest Shots' : '✨ Generate from Brief')}
-                </button>
+                <div className="flex items-center gap-2">
+                    <button onClick={() => setShowTemplateSelector(true)} className="flex items-center px-3 py-1.5 border border-gray-300 text-gray-700 text-sm font-semibold rounded-md hover:bg-gray-50 transition-colors">
+                        📋 Load Template
+                    </button>
+                    <button onClick={generateShotList} disabled={isLoading} className="flex items-center px-3 py-1.5 border border-indigo-600 text-indigo-600 text-sm font-semibold rounded-md hover:bg-indigo-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-300 transition-colors">
+                        <SparklesIcon className="h-4 w-4 mr-2"/>
+                        {isLoading ? 'Generating...' : (data.userRole === 'Client' ? '✨ Suggest Shots' : '✨ Generate from Brief')}
+                    </button>
+                </div>
             </div>
             <p className="text-gray-600">
                 {data.userRole === 'Client' ? "Are there any 'must-have' photos you need? List them here or use the suggestion tool." : "Add individual shots to the list, or generate ideas from the brief above."}
             </p>
             
             <div className="space-y-4">
-                {shotList.map((shot, index) => (
-                    <div key={shot.id} className="p-4 border rounded-lg bg-white relative space-y-4">
-                        <div className="flex justify-between items-start">
-                             <h3 className="font-semibold text-gray-800">Shot #{index + 1}</h3>
-                             <button onClick={() => removeShot(shot.id)} className="text-gray-400 hover:text-red-500"><TrashIcon className="h-5 w-5"/></button>
-                        </div>
-                        <Textarea id={`shot-desc-${shot.id}`} label="Description" placeholder="e.g., Hero shot of the final dish on a rustic wooden table." value={shot.description} onChange={(e) => handleShotChange(shot.id, 'description', e.target.value)} />
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                           <Select id={`shot-type-${shot.id}`} label="Shot Type" value={shot.shotType} onChange={(e) => handleShotChange(shot.id, 'shotType', e.target.value)}>
-                                <option>Wide</option><option>Medium</option><option>Close-up</option><option>Detail</option><option>Overhead</option>
-                           </Select>
-                           <Select id={`shot-angle-${shot.id}`} label="Angle" value={shot.angle} onChange={(e) => handleShotChange(shot.id, 'angle', e.target.value)}>
-                                <option>Eye-level</option><option>High Angle</option><option>Low Angle</option><option>Dutch Angle</option>
-                           </Select>
-                        </div>
-                        <Input id={`shot-notes-${shot.id}`} label="Notes (Props, Lighting, etc.)" placeholder="e.g., Use natural side light, include fresh herbs as props." value={shot.notes} onChange={(e) => handleShotChange(shot.id, 'notes', e.target.value)} />
-                        <div className="flex items-center">
-                            <input id={`shot-priority-${shot.id}`} type="checkbox" className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked={shot.priority} onChange={(e) => handleShotChange(shot.id, 'priority', e.target.checked)} />
-                            <label htmlFor={`shot-priority-${shot.id}`} className="ml-2 block text-sm text-gray-900">Mark as &quot;must-have&quot; shot</label>
-                        </div>
-                    </div>
-                ))}
+                <SortableShotList 
+                    shots={shotList}
+                    handleUpdate={handleShotChange}
+                    handleRemove={removeShot}
+                    onShotsChange={(shots) => updateData('shotList', shots)}
+                    handleDuplicate={(shot) => {
+                        const newShot = { ...shot, id: Date.now() + Math.random() };
+                        updateData('shotList', [...shotList, newShot]);
+                    }}
+                    handleReorder={(reorderedShots) => {
+                        updateData('shotList', reorderedShots);
+                    }}
+                />
             </div>
             <button onClick={addShot} className="w-full flex justify-center items-center px-4 py-2 border border-dashed border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">+ Add Shot</button>
 
@@ -755,6 +758,25 @@ const ShotListStep = ({ data, updateData }: StepProps) => {
                     <p className="text-sm text-gray-500">Add shots and click Estimate.</p>
                 )}
             </div>
+
+            {/* Template Selector Modal */}
+            {showTemplateSelector && (
+                <TemplateSelector
+                    onSelectTemplate={(template) => {
+                        const t: any = (template as any).data || {};
+                        // apply common fields from template
+                        updateData('projectName', t.projectName);
+                        updateData('projectType', t.projectType);
+                        updateData('overview', t.overview);
+                        updateData('objectives', t.objectives);
+                        updateData('shotList', t.shotList || []);
+                        updateData('equipment' as any, t.equipment as any || []);
+                        updateData('crew' as any, t.crew as any || []);
+                        setShowTemplateSelector(false);
+                    }}
+                    onClose={() => setShowTemplateSelector(false)}
+                />
+            )}
         </div>
     );
 };
@@ -1122,10 +1144,24 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
                 <button onClick={() => setEmailModalOpen(true)} className="w-full md:w-auto px-4 py-2 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 transition-colors shadow-sm">Email Brief</button>
             </div>
 
+            {/* Export Buttons */}
+            <div className="flex flex-wrap gap-2 mt-2">
+                <button onClick={() => exportAsJSON(data as any)} className="px-3 py-1.5 bg-gray-100 text-gray-800 text-sm rounded-md hover:bg-gray-200">💾 JSON</button>
+                <button onClick={() => exportAsMarkdown(data as any)} className="px-3 py-1.5 bg-gray-100 text-gray-800 text-sm rounded-md hover:bg-gray-200">📝 Markdown</button>
+                {data.shotList && data.shotList.length > 0 && (
+                    <button onClick={() => exportShotListAsCSV(data as any)} className="px-3 py-1.5 bg-gray-100 text-gray-800 text-sm rounded-md hover:bg-gray-200">📊 Shot List CSV</button>
+                )}
+                {Array.isArray((data as any).budgetLineItems) && (data as any).budgetLineItems.length > 0 && (
+                    <button onClick={() => exportBudgetAsCSV(data as any)} className="px-3 py-1.5 bg-gray-100 text-gray-800 text-sm rounded-md hover:bg-gray-200">💰 Budget CSV</button>
+                )}
+                <button onClick={() => downloadICalendar(data as any)} className="px-3 py-1.5 bg-gray-100 text-gray-800 text-sm rounded-md hover:bg-gray-200">📅 iCalendar (.ics)</button>
+                <a href={generateGoogleCalendarUrl(data as any)} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-gray-100 text-gray-800 text-sm rounded-md hover:bg-gray-200">↗ Open Google Calendar</a>
+            </div>
+
             <Modal isOpen={isEmailModalOpen} onClose={() => setEmailModalOpen(false)} title="Send Brief via Email">
                 <div className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Recipients</label>
+                                                                                             <label className="block text-sm font-medium text-gray-700 mb-1">Recipients</label>
                         <input type="text" value={additionalRecipients} onChange={(e) => setAdditionalRecipients(e.target.value)} className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Enter email addresses, separated by commas" />
                         <div className="flex items-center mt-2">
                             <input id="send-to-self" type="checkbox" checked={includeSelf} onChange={(e) => setIncludeSelf(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
@@ -1158,8 +1194,45 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
 // --- MAIN APP COMPONENT ---
 
 export default function BriefBuilder() {
-    const [step, setStep] = useState(1);
+    const { role, currentStep, briefData, setRole, setCurrentStep, updateBriefData, getCompletionPercentage, getMissingRequiredFields, isDirty, lastSaved, markSaved } = useBriefStore();
     const [formData, setFormData] = useState<FormData>({});
+    const [darkMode, setDarkMode] = useState(false);
+
+    // enable auto-save and before-unload warning
+    useAutoSave(30000);
+    useBeforeUnload();
+
+    useEffect(() => {
+        // initialize theme
+        const stored = typeof window !== 'undefined' ? localStorage.getItem('theme') : null;
+        const isDark = stored ? stored === 'dark' : false;
+        setDarkMode(isDark);
+        if (isDark) document.documentElement.classList.add('dark');
+    }, []);
+
+    const toggleDark = () => {
+        const next = !darkMode;
+        setDarkMode(next);
+        if (next) {
+            document.documentElement.classList.add('dark');
+            localStorage.setItem('theme', 'dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+            localStorage.setItem('theme', 'light');
+        }
+    };
+
+    // Keep formData in sync with briefData
+    useEffect(() => {
+        setFormData(briefData as FormData);
+    }, [briefData]);
+
+    // Keep role in sync
+    useEffect(() => {
+        if (formData.userRole && formData.userRole !== role) {
+            setRole(formData.userRole);
+        }
+    }, [formData.userRole, role, setRole]);
     const [wizardStarted, setWizardStarted] = useState(false);
     const [steps, setSteps] = useState<Step[]>([]);
     const [scriptsLoaded, setScriptsLoaded] = useState(false);
@@ -1196,32 +1269,24 @@ export default function BriefBuilder() {
 
     const updateFormData = (key: keyof FormData, value: FormData[keyof FormData]) => {
         setFormData(prev => ({ ...prev, [key]: value }));
+        // persist to store for auto-save and cross-page consistency
+        updateBriefData({ [key]: value } as any);
     };
 
-    const buildStepsForRole = (role: string): Step[] => {
-        const base: Step[] = [
-            { id: 'client-info', title: 'Your Information', icon: <UserIcon /> },
-            { id: 'details', title: 'Project Details', icon: <BriefcaseIcon /> },
-            { id: 'moodboard', title: 'Mood Board', icon: <ImageIcon /> },
-            { id: 'deliverables', title: 'Deliverables', icon: <CameraIcon /> },
-            { id: 'shotlist', title: 'Shot List', icon: <ListIcon /> },
-        ];
-        const review: Step = { id: 'review', title: 'Review & Distribute', icon: <CheckCircleIcon /> };
-        if (role === 'Client') {
-            return [base[0], base[1], base[2], { id: 'contact', title: 'Contact Info', icon: <MailIcon /> }, base[3], base[4], review];
-        }
-        if (role === 'Photographer') {
-            return [base[0], base[1], base[2], { id: 'location', title: 'Date & Location', icon: <MapPinIcon /> }, base[3], base[4], { id: 'callsheet', title: 'Crew & Talent', icon: <UsersIcon /> }, review];
-        }
-        // Producer (default)
-        return [base[0], base[1], base[2], { id: 'location', title: 'Date & Location', icon: <MapPinIcon /> }, base[3], base[4], { id: 'callsheet', title: 'Call Sheet & Logistics', icon: <UsersIcon /> }, review];
+    const buildStepsForRole = (role: UserRole): Step[] => {
+        return ROLE_STEPS[role].map((stepConfig: WizardStep) => ({
+            id: stepConfig.id,
+            title: stepConfig.title,
+            icon: <stepConfig.icon />
+        }));
     };
 
-    const handleRoleSelect = (role: string) => {
-        updateFormData('userRole', role);
-        setSteps(buildStepsForRole(role));
+    const handleRoleSelect = (selectedRole: UserRole) => {
+        setRole(selectedRole);
+        updateBriefData({ userRole: selectedRole });
+        setSteps(buildStepsForRole(selectedRole));
         setWizardStarted(true);
-        setStep(1);
+        setCurrentStep(1);
     };
 
     useEffect(() => {
@@ -1234,7 +1299,7 @@ export default function BriefBuilder() {
     }, [formData.userRole]);
     
     const nextStep = () => {
-        const currentStepId = steps[step - 1]?.id;
+        const currentStepId = steps[currentStep]?.id;
         if (currentStepId === 'client-info') {
             const nameOk = (formData.clientName || '').trim().length > 0;
             const emailOk = (formData.clientEmail || '').trim().length > 0;
@@ -1244,53 +1309,107 @@ export default function BriefBuilder() {
             }
         }
         setShowClientInfoErrors(false);
-        setStep(prev => Math.min(prev + 1, steps.length));
+        setCurrentStep(Math.min(currentStep + 1, steps.length - 1));
     };
-    const prevStep = () => setStep(prev => Math.max(prev - 1, 1));
-    const goToStep = (stepNumber: number) => setStep(stepNumber);
+    const prevStep = () => setCurrentStep(Math.max(currentStep - 1, 0));
+    const goToStep = (stepNumber: number) => setCurrentStep(stepNumber - 1);
+
+    // Keyboard shortcuts: Cmd/Ctrl+S to save, arrows to navigate
+    useEffect(() => {
+        const onKeyDown = (e: KeyboardEvent) => {
+            const isMod = e.metaKey || e.ctrlKey;
+            if (isMod && e.key.toLowerCase() === 's') {
+                e.preventDefault();
+                markSaved();
+            }
+            if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                nextStep();
+            }
+            if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                prevStep();
+            }
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [markSaved, nextStep, prevStep]);
 
     const renderStep = () => {
-        const currentStepId = steps[step - 1]?.id;
+        const currentStepId = steps[currentStep]?.id;
         switch (currentStepId) {
             case 'client-info': return <ClientInfoStep data={formData} updateData={updateFormData} showErrors={showClientInfoErrors} />;
-            case 'details': return <ProjectDetailsStep data={formData} updateData={updateFormData} />;
+            case 'project-details': return <ProjectDetailsStep data={formData} updateData={updateFormData} />;
             case 'moodboard': return <MoodboardStep data={formData} updateData={updateFormData} />;
             case 'contact': return <ContactStep data={formData} updateData={updateFormData} />;
-            case 'location': return <LocationShootDateStep data={formData} updateData={updateFormData} />;
+            case 'location-date': return <LocationShootDateStep data={formData} updateData={updateFormData} />;
             case 'deliverables': return <DeliverablesStep data={formData} updateData={updateFormData} />;
-            case 'shotlist': return <ShotListStep data={formData} updateData={updateFormData} />;
-            case 'callsheet': return <CallSheetStep data={formData} updateData={updateFormData} />;
+            case 'shot-list': return <ShotListStep data={formData} updateData={updateFormData} />;
+            case 'crew': return <CallSheetStep data={formData} updateData={updateFormData} />;
+            case 'call-sheet': return <CallSheetStep data={formData} updateData={updateFormData} />;
+            case 'budget': return <DeliverablesStep data={formData} updateData={updateFormData} />;
             case 'review': return <ReviewStep data={formData} scriptsLoaded={scriptsLoaded} />;
-            default: return <div>Loading...</div>;
+            default: return (
+                <div className="space-y-4">
+                    <div className="h-6 w-48 bg-gray-200 rounded animate-pulse dark:bg-slate-800" />
+                    <div className="h-4 w-full bg-gray-200 rounded animate-pulse dark:bg-slate-800" />
+                    <div className="h-4 w-5/6 bg-gray-200 rounded animate-pulse dark:bg-slate-800" />
+                    <div className="h-4 w-2/3 bg-gray-200 rounded animate-pulse dark:bg-slate-800" />
+                </div>
+            );
         }
     };
 
     if (!wizardStarted) {
-        return <StartPage onSelectRole={handleRoleSelect} />;
+        return <StartPage onSelectRole={(role: string) => handleRoleSelect(role as UserRole)} />;
     }
 
-    const currentStepConfig = steps[step - 1] || {} as Step;
-    const isOptional = ['shotlist', 'callsheet', 'moodboard'].includes(currentStepConfig.id);
-    const isFinalStep = step === steps.length;
+    const currentStepConfig = steps[currentStep] || {} as Step;
+    const isOptional = ['shot-list', 'call-sheet', 'moodboard', 'crew'].includes(currentStepConfig.id);
+    const isFinalStep = currentStep === steps.length - 1;
     const isClientInfo = currentStepConfig.id === 'client-info';
     const isNextDisabled = isClientInfo && (!((formData.clientName || '').trim()) || !((formData.clientEmail || '').trim()));
+
+    const completion = getCompletionPercentage ? getCompletionPercentage() : 0;
+    const missingFields = getMissingRequiredFields ? getMissingRequiredFields() : [];
 
     return (
         <div className="bg-gray-100 min-h-screen font-sans p-4 sm:p-6 lg:p-8">
             <div className="max-w-6xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden md:flex">
                 {/* Sidebar / Progress Bar */}
-                <div className="md:w-1/3 bg-gray-50 p-8 border-r border-gray-200">
-                    <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                <div className="md:w-1/3 bg-gray-50 p-8 border-r border-gray-200 dark:bg-slate-900 dark:border-slate-800">
+                    <h1 className="text-2xl font-bold text-gray-900 mb-2 dark:text-white">
                         {formData.userRole === 'Client' ? 'Project Inquiry' : 'Photography Brief'}
                     </h1>
-                    <p className="text-gray-600 mb-8">Created by <span className="font-semibold">{formData.clientName || formData.userRole}</span></p>
+                    <div className="flex items-center justify-between mb-3">
+                        <p className="text-gray-600 dark:text-slate-300">Created by <span className="font-semibold">{formData.clientName || formData.userRole}</span></p>
+                        <button onClick={toggleDark} className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-slate-700 dark:text-slate-200">
+                            {darkMode ? '🌙 Dark' : '☀️ Light'}
+                        </button>
+                    </div>
+                    <div className="mb-3 text-xs">
+                        {isDirty ? (
+                            <div className="inline-flex items-center gap-2 px-2 py-1 rounded bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                                <span className="h-2 w-2 rounded-full bg-yellow-500 animate-pulse"></span>
+                                Unsaved changes
+                            </div>
+                        ) : lastSaved ? (
+                            <div className="inline-flex items-center gap-2 px-2 py-1 rounded bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                <span className="h-2 w-2 rounded-full bg-green-500"></span>
+                                Saved {new Date(lastSaved).toLocaleTimeString()}
+                            </div>
+                        ) : null}
+                    </div>
+                    <div className="mb-8">
+                        <ProgressIndicator percentage={completion} missingFields={missingFields as any} showDetails={true} />
+                    </div>
                     <nav>
                         <ul className="space-y-4">
                             {steps.map((s, index) => (
                                 <li key={s.id}>
-                                    <button onClick={() => goToStep(index + 1)} className={`w-full flex items-center text-left p-3 rounded-lg transition-colors duration-200 ${step === (index + 1) ? 'bg-indigo-100 text-indigo-700' : 'text-gray-800 hover:bg-gray-200'}`}>
-                                        <div className={`flex items-center justify-center h-10 w-10 rounded-full border-2 ${step >= (index + 1) ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-300 text-gray-700'}`}>
-                                            {step > (index + 1) ? '✔' : (index + 1)}
+                                    <button onClick={() => goToStep(index + 1)} className={`w-full flex items-center text-left p-3 rounded-lg transition-colors duration-200 ${currentStep === index ? 'bg-indigo-100 text-indigo-700' : 'text-gray-800 hover:bg-gray-200'}`}>
+                                        <div className={`flex items-center justify-center h-10 w-10 rounded-full border-2 ${currentStep >= index ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-300 text-gray-700'}`}>
+                                            {currentStep > index ? '✔' : (index + 1)}
                                         </div>
                                         <span className="ml-4 font-medium">{s.title}</span>
                                     </button>
@@ -1301,16 +1420,23 @@ export default function BriefBuilder() {
                 </div>
 
                 {/* Main Content */}
-                <div className="md:w-2/3 p-8 md:p-12 overflow-y-auto" style={{maxHeight: '90vh'}}>
+                <div className="md:w-2/3 p-8 md:p-12 overflow-y-auto dark:bg-slate-950 dark:text-slate-100" style={{maxHeight: '90vh'}}>
                     <div className="animate-fade-in">
-                        {steps.length > 0 ? renderStep() : <div>Loading...</div>}
+                        {steps.length > 0 ? renderStep() : (
+                          <div className="space-y-4">
+                            <div className="h-6 w-48 bg-gray-200 rounded animate-pulse dark:bg-slate-800" />
+                            <div className="h-4 w-full bg-gray-200 rounded animate-pulse dark:bg-slate-800" />
+                            <div className="h-4 w-5/6 bg-gray-200 rounded animate-pulse dark:bg-slate-800" />
+                            <div className="h-4 w-2/3 bg-gray-200 rounded animate-pulse dark:bg-slate-800" />
+                          </div>
+                        )}
                     </div>
                     
                     {/* Navigation */}
                     {!isFinalStep && (
                         <div className="mt-12 pt-6 border-t border-gray-200 flex justify-between items-center">
                             <div>
-                                {step > 1 && (
+                                {currentStep > 0 && (
                                     <button onClick={prevStep} className="px-6 py-2 bg-gray-200 text-gray-700 font-semibold rounded-md hover:bg-gray-300 transition-colors">Back</button>
                                 )}
                             </div>
