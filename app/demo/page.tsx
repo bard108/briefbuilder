@@ -10,20 +10,26 @@ import { useBriefStore, useAutoSave, useBeforeUnload } from '@/lib/stores/brief-
 import { exportAsJSON, exportAsMarkdown, exportShotListAsCSV } from '@/lib/utils/export-utils';
 import { downloadICalendar } from '@/lib/utils/calendar-export';
 import type { Template } from '@/lib/templates';
+import type { FormData as BriefFormData } from '@/lib/schemas/brief-schema';
 
 export default function DemoPage() {
   const [showTemplates, setShowTemplates] = useState(false);
   const [activeTab, setActiveTab] = useState<'shots' | 'equipment' | 'budget'>('shots');
 
   const {
-    formData,
-    updateFormData,
+    briefData,
+    updateBriefData,
     isDirty,
     lastSaved,
     getCompletionPercentage,
     getMissingRequiredFields,
-    resetFormData,
+    resetBrief,
   } = useBriefStore();
+
+  const formData = briefData as BriefFormData;
+  const updateFormData = (key: keyof BriefFormData, value: BriefFormData[keyof BriefFormData]) =>
+    updateBriefData({ [key]: value } as Partial<BriefFormData>);
+  const resetFormData = () => resetBrief();
 
   // Enable auto-save
   useAutoSave(30000);
@@ -259,7 +265,20 @@ export default function DemoPage() {
                     </div>
                     <SortableShotList
                       shots={formData.shotList || []}
-                      onShotsChange={(shots) => updateFormData('shotList', shots)}
+                      onShotsChange={(shots) => updateFormData('shotList', shots as any)}
+                      handleUpdate={(id: number, field: any, value: any) => {
+                        const updated = (formData.shotList || []).map(s => s.id === id ? { ...s, [field]: value } : s);
+                        updateFormData('shotList', updated as any);
+                      }}
+                      handleRemove={(id: number) => {
+                        const next = (formData.shotList || []).filter(s => s.id !== id);
+                        updateFormData('shotList', next as any);
+                      }}
+                      handleDuplicate={(shot: any) => {
+                        const copy = { ...shot, id: Date.now() + Math.random() };
+                        updateFormData('shotList', ([...(formData.shotList || []), copy]) as any);
+                      }}
+                      handleReorder={(reordered: any[]) => updateFormData('shotList', reordered as any)}
                     />
                     {(!formData.shotList || formData.shotList.length === 0) && (
                       <div className="text-center py-12 text-gray-500">
