@@ -22,16 +22,17 @@ export function RoleSwitcher({
   showDescription = true,
   onRoleChange 
 }: RoleSwitcherProps) {
-  const { userRole, setUserRole } = useBriefStore();
+  const { role, setRole } = useBriefStore();
   const [isOpen, setIsOpen] = useState(false);
 
   const roles: UserRole[] = ['Client', 'Photographer', 'Producer'];
-  const currentRoleConfig = getRoleConfig(userRole);
+  const currentRole = (role || 'Client') as UserRole;
+  const currentRoleConfig = getRoleConfig(currentRole);
 
-  const handleRoleChange = (role: UserRole) => {
-    setUserRole(role);
+  const handleRoleChange = (newRole: UserRole) => {
+    setRole(newRole);
     setIsOpen(false);
-    onRoleChange?.(role);
+    onRoleChange?.(newRole);
   };
 
   if (compact) {
@@ -66,14 +67,14 @@ export function RoleSwitcher({
               onClick={() => setIsOpen(false)}
             />
             <div className="absolute top-full right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-20 overflow-hidden">
-              {roles.map((role) => {
-                const config = getRoleConfig(role);
+              {roles.map((r) => {
+                const config = getRoleConfig(r);
                 return (
                   <button
-                    key={role}
-                    onClick={() => handleRoleChange(role)}
+                    key={r}
+                    onClick={() => handleRoleChange(r)}
                     className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0 ${
-                      role === userRole ? 'bg-gray-50' : ''
+                      r === currentRole ? 'bg-gray-50' : ''
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -88,7 +89,7 @@ export function RoleSwitcher({
                           </div>
                         )}
                       </div>
-                      {role === userRole && (
+                      {r === currentRole && (
                         <svg 
                           className="w-5 h-5 text-green-500 ml-auto" 
                           fill="none" 
@@ -127,14 +128,14 @@ export function RoleSwitcher({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {roles.map((role) => {
-          const config = getRoleConfig(role);
-          const isSelected = role === userRole;
+        {roles.map((r) => {
+          const config = getRoleConfig(r);
+          const isSelected = r === currentRole;
 
           return (
             <button
-              key={role}
-              onClick={() => handleRoleChange(role)}
+              key={r}
+              onClick={() => handleRoleChange(r)}
               className={`relative p-6 rounded-xl border-2 transition-all text-left ${
                 isSelected
                   ? 'border-current shadow-lg scale-105'
@@ -213,7 +214,8 @@ export function RoleSwitcher({
  * Simple role selector for forms
  */
 export function RoleSelect() {
-  const { userRole, setUserRole } = useBriefStore();
+  const { role, setRole } = useBriefStore();
+  const value = (role || 'Client') as UserRole;
 
   return (
     <div>
@@ -225,8 +227,8 @@ export function RoleSelect() {
       </label>
       <select
         id="role-select"
-        value={userRole}
-        onChange={(e) => setUserRole(e.target.value as UserRole)}
+        value={value}
+        onChange={(e) => setRole(e.target.value as UserRole)}
         className="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
       >
         <option value="Client">👤 Client</option>
