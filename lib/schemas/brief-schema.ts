@@ -97,12 +97,27 @@ export const formDataSchema = z.object({
   overview: z.string().optional(),
   objectives: z.string().optional(),
   audience: z.string().optional(),
+  brandGuidelines: z.string().optional(),
+  styleReferences: z.string().optional(),
+  competitorNotes: z.string().optional(),
+  legalRequirements: z.string().optional(),
   
   // Shoot Details
   shootDates: z.string().optional(),
   shootStatus: z.enum(['Confirmed', 'Pencil', 'Proposed', 'TBD']).optional(),
   location: z.string().optional(),
   locationDetails: locationSchema.optional(),
+  
+  // Production Logistics
+  permitsRequired: z.string().optional(),
+  insuranceDetails: z.string().optional(),
+  safetyProtocols: z.string().optional(),
+  backupPlan: z.string().optional(),
+  powerRequirements: z.string().optional(),
+  internetRequired: z.boolean().optional(),
+  cateringNotes: z.string().optional(),
+  transportationDetails: z.string().optional(),
+  accommodationDetails: z.string().optional(),
   
   // Creative Direction
   moodboardLink: z.string().optional(),
@@ -113,6 +128,13 @@ export const formDataSchema = z.object({
   fileTypes: z.array(z.string()).optional(),
   usageRights: z.array(z.string()).optional(),
   socialPlatforms: z.array(z.string()).optional(),
+  
+  // Post-Production Requirements
+  editingRequirements: z.string().optional(),
+  colorGradingNotes: z.string().optional(),
+  turnaroundTime: z.string().optional(),
+  revisionRounds: z.string().optional(),
+  finalDeliveryFormat: z.string().optional(),
   
   // Shot List
   shotList: z.array(shotSchema).optional(),

@@ -53,7 +53,28 @@ interface FormData {
   emergencyContact?: string;
   nearestHospital?: string;
   notes?: string;
-  // New fields
+  // Brand & Creative References
+  brandGuidelines?: string;
+  styleReferences?: string;
+  competitorNotes?: string;
+  legalRequirements?: string;
+  // Production Logistics
+  permitsRequired?: string;
+  insuranceDetails?: string;
+  safetyProtocols?: string;
+  backupPlan?: string;
+  powerRequirements?: string;
+  internetRequired?: boolean;
+  cateringNotes?: string;
+  transportationDetails?: string;
+  accommodationDetails?: string;
+  // Post-Production
+  editingRequirements?: string;
+  colorGradingNotes?: string;
+  turnaroundTime?: string;
+  revisionRounds?: string;
+  finalDeliveryFormat?: string;
+  // Other fields
   stepMeta?: Record<string, { owner?: string; dueDate?: string; status?: 'Not Started' | 'In Progress' | 'Complete' }>;
   currency?: 'USD' | 'EUR' | 'GBP';
   budgetEstimate?: { total: number; breakdown: Record<string, number> };
@@ -439,6 +460,41 @@ const ProjectDetailsStep = ({ data, updateData }: StepProps) => {
             <Textarea label="Project Overview" id="overview" placeholder="Briefly describe the project..." value={data.overview || ''} onChange={(e) => updateData('overview', e.target.value)} />
             <Textarea label="Key Objectives & Messages" id="objectives" placeholder="What should these images achieve or communicate?" value={data.objectives || ''} onChange={(e) => updateData('objectives', e.target.value)} />
             <Textarea label="Target Audience" id="audience" placeholder="Describe the ideal customer or viewer." value={data.audience || ''} onChange={(e) => updateData('audience', e.target.value)} />
+            
+            {/* Brand & Creative References */}
+            <div className="border-t border-gray-200 pt-6 mt-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Brand & Creative References</h3>
+                <div className="space-y-4">
+                    <Input 
+                        label="Brand Guidelines (URL)" 
+                        id="brandGuidelines" 
+                        placeholder="Link to brand style guide or documentation" 
+                        value={data.brandGuidelines || ''} 
+                        onChange={(e) => updateData('brandGuidelines', e.target.value)} 
+                    />
+                    <Textarea 
+                        label="Style References" 
+                        id="styleReferences" 
+                        placeholder="Links to inspiration images, similar campaigns, or visual references..." 
+                        value={data.styleReferences || ''} 
+                        onChange={(e) => updateData('styleReferences', e.target.value)} 
+                    />
+                    <Textarea 
+                        label="What to Avoid / Competitor Notes" 
+                        id="competitorNotes" 
+                        placeholder="Styles, brands, or approaches to avoid..." 
+                        value={data.competitorNotes || ''} 
+                        onChange={(e) => updateData('competitorNotes', e.target.value)} 
+                    />
+                    <Textarea 
+                        label="Legal & Compliance Requirements" 
+                        id="legalRequirements" 
+                        placeholder="Any legal restrictions, disclaimers, or compliance needs..." 
+                        value={data.legalRequirements || ''} 
+                        onChange={(e) => updateData('legalRequirements', e.target.value)} 
+                    />
+                </div>
+            </div>
         </div>
     );
 };
@@ -465,6 +521,82 @@ const LocationShootDateStep = ({ data, updateData }: StepProps) => (
              <Input label="Shoot Status" id="shootStatus" type="text" placeholder="e.g., Confirmed, Pencil" value={data.shootStatus || ''} onChange={(e) => updateData('shootStatus', e.target.value)} />
         </div>
         <Textarea label="Location Address & Details" id="location" placeholder="Provide the full address and any important details like parking, access, etc." value={data.location || ''} onChange={(e) => updateData('location', e.target.value)} />
+        
+        {/* Production Logistics */}
+        <div className="border-t border-gray-200 pt-6 mt-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Production Logistics</h3>
+            <div className="space-y-4">
+                <Textarea 
+                    label="Permits & Licenses Required" 
+                    id="permitsRequired" 
+                    placeholder="List any permits, licenses, or permissions needed..." 
+                    value={data.permitsRequired || ''} 
+                    onChange={(e) => updateData('permitsRequired', e.target.value)} 
+                />
+                <Textarea 
+                    label="Insurance Requirements" 
+                    id="insuranceDetails" 
+                    placeholder="General liability, equipment insurance, certificate of insurance..." 
+                    value={data.insuranceDetails || ''} 
+                    onChange={(e) => updateData('insuranceDetails', e.target.value)} 
+                />
+                <Textarea 
+                    label="Safety Protocols & Risk Assessment" 
+                    id="safetyProtocols" 
+                    placeholder="COVID protocols, PPE requirements, hazards on location..." 
+                    value={data.safetyProtocols || ''} 
+                    onChange={(e) => updateData('safetyProtocols', e.target.value)} 
+                />
+                <Textarea 
+                    label="Weather Backup Plan / Rain Date" 
+                    id="backupPlan" 
+                    placeholder="What's the plan if weather doesn't cooperate?" 
+                    value={data.backupPlan || ''} 
+                    onChange={(e) => updateData('backupPlan', e.target.value)} 
+                />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <Textarea 
+                        label="Power Requirements" 
+                        id="powerRequirements" 
+                        placeholder="Generators, outlets needed, power capacity..." 
+                        value={data.powerRequirements || ''} 
+                        onChange={(e) => updateData('powerRequirements', e.target.value)} 
+                    />
+                    <div className="space-y-4">
+                        <label className="flex items-center space-x-3">
+                            <input 
+                                type="checkbox" 
+                                checked={data.internetRequired || false}
+                                onChange={(e) => updateData('internetRequired', e.target.checked)}
+                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            />
+                            <span className="text-gray-700 font-medium">Internet/WiFi Required</span>
+                        </label>
+                        <Textarea 
+                            label="Catering & Dietary Requirements" 
+                            id="cateringNotes" 
+                            placeholder="Meal times, dietary restrictions, crew size..." 
+                            value={data.cateringNotes || ''} 
+                            onChange={(e) => updateData('cateringNotes', e.target.value)} 
+                        />
+                    </div>
+                </div>
+                <Textarea 
+                    label="Transportation & Parking" 
+                    id="transportationDetails" 
+                    placeholder="Parking instructions, load-in areas, transportation needs..." 
+                    value={data.transportationDetails || ''} 
+                    onChange={(e) => updateData('transportationDetails', e.target.value)} 
+                />
+                <Textarea 
+                    label="Accommodation Details" 
+                    id="accommodationDetails" 
+                    placeholder="Hotels, green rooms, changing areas, restrooms..." 
+                    value={data.accommodationDetails || ''} 
+                    onChange={(e) => updateData('accommodationDetails', e.target.value)} 
+                />
+            </div>
+        </div>
     </div>
 );
 
@@ -640,6 +772,50 @@ const DeliverablesStep = ({ data, updateData }: StepProps) => {
                     <CheckboxGroup legend="Required Social Platforms / Aspect Ratios" options={socialPlatformOptions} selectedOptions={data.socialPlatforms || []} onChange={(id) => handleCheckboxChange('socialPlatforms', id)} />
                 </div>
             )}
+            
+            {/* Post-Production Requirements */}
+            <div className="border-t border-gray-200 pt-6 mt-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Post-Production & Delivery</h3>
+                <div className="space-y-4">
+                    <Textarea 
+                        label="Editing Requirements" 
+                        id="editingRequirements" 
+                        placeholder="Describe editing style, retouching needs, compositing requirements..." 
+                        value={data.editingRequirements || ''} 
+                        onChange={(e) => updateData('editingRequirements', e.target.value)} 
+                    />
+                    <Textarea 
+                        label="Color Grading Notes" 
+                        id="colorGradingNotes" 
+                        placeholder="Specific color grading preferences, look/feel, reference images..." 
+                        value={data.colorGradingNotes || ''} 
+                        onChange={(e) => updateData('colorGradingNotes', e.target.value)} 
+                    />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <Input 
+                            label="Turnaround Time" 
+                            id="turnaroundTime" 
+                            placeholder="e.g., 2 weeks, 5 business days" 
+                            value={data.turnaroundTime || ''} 
+                            onChange={(e) => updateData('turnaroundTime', e.target.value)} 
+                        />
+                        <Input 
+                            label="Revision Rounds" 
+                            id="revisionRounds" 
+                            placeholder="e.g., 2 rounds included" 
+                            value={data.revisionRounds || ''} 
+                            onChange={(e) => updateData('revisionRounds', e.target.value)} 
+                        />
+                    </div>
+                    <Textarea 
+                        label="Final Delivery Format" 
+                        id="finalDeliveryFormat" 
+                        placeholder="How should final files be delivered? (e.g., Dropbox, Google Drive, specific naming convention...)" 
+                        value={data.finalDeliveryFormat || ''} 
+                        onChange={(e) => updateData('finalDeliveryFormat', e.target.value)} 
+                    />
+                </div>
+            </div>
         </div>
     );
 };
@@ -1010,10 +1186,23 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
     };
 
     const handleShare = () => {
-        const mockToken = Math.random().toString(36).substring(2, 10);
-        const link = `${window.location.origin}/share/${mockToken}`;
-        setShareLink(link);
-        setShareModalOpen(true);
+        try {
+            // Encode the brief data for sharing
+            const jsonStr = JSON.stringify(data);
+            const encodedData = btoa(jsonStr);
+            
+            // Create a unique token (optional, for aesthetics)
+            const token = Math.random().toString(36).substring(2, 10);
+            
+            // Build the share URL with encoded data
+            const link = `${window.location.origin}/share/${token}?d=${encodedData}`;
+            
+            setShareLink(link);
+            setShareModalOpen(true);
+        } catch (error) {
+            console.error('Error creating share link:', error);
+            alert('Failed to create share link. The brief data may be too large.');
+        }
     };
 
     const copyToClipboard = () => {
