@@ -12,7 +12,7 @@ import { ProgressIndicator } from './ui/progress-indicator';
 import { exportShotListAsCSV, exportBudgetAsCSV } from '@/lib/utils/export-utils';
 import { downloadICalendar, generateGoogleCalendarUrl } from '@/lib/utils/calendar-export';
 import { callGeminiAPI, analyzeBrief, checkBudgetReasonableness, generateProjectIdeas, generateShotList as generateShotListAI, generateShotsFromImages } from '@/lib/utils/ai-helpers';
-
+import { generateEnhancedPDF } from '@/lib/utils/pdf-generator';
 import { ClientInfoStep } from './client-info-step';
 
 // --- Type Definitions ---
@@ -982,8 +982,6 @@ interface ReviewStepProps {
 
 const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
     const [isEmailModalOpen, setEmailModalOpen] = useState(false);
-    const [isShareModalOpen, setShareModalOpen] = useState(false);
-    const [shareLink, setShareLink] = useState('');
     const [includeSelf, setIncludeSelf] = useState<boolean>(!!data.clientEmail);
     const [additionalRecipients, setAdditionalRecipients] = useState('');
     const [isSending, setIsSending] = useState(false);
@@ -991,205 +989,36 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
     const [isAnalysisModalOpen, setAnalysisModalOpen] = useState(false);
     const [analysisResults, setAnalysisResults] = useState<{ brief?: string; budget?: string }>({});
     const briefContentRef = useRef<HTMLDivElement | null>(null);
-    const shareLinkRef = useRef<HTMLInputElement | null>(null);
 
     const handleDownloadPdf = async () => {
         try {
-            const input = briefContentRef.current as HTMLElement | null;
-            if (!input) {
-                alert('Content not ready for PDF generation.');
-                return;
-            }
-
-            let jsPDFConstructor: any = null;
-            let html2canvasFunc: any = null;
-
-            if (window.jspdf && window.html2canvas) {
-                jsPDFConstructor = window.jspdf.jsPDF || window.jspdf;
-                html2canvasFunc = window.html2canvas;
-            } else {
-                const imports: any = await Promise.all([import('jspdf'), import('html2canvas')]);
-                jsPDFConstructor = (imports[0] && (imports[0].jsPDF || imports[0])) || null;
-                html2canvasFunc = (imports[1] && (imports[1].default || imports[1])) || null;
-            }
-
-            if (!jsPDFConstructor || !html2canvasFunc) {
-                alert('PDF generation libraries are not available.');
-                return;
-            }
-
-            let canvas: HTMLCanvasElement | null = null;
-            try {
-                // Try rendering the actual DOM with safe options
-                canvas = await html2canvasFunc(input, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff' });
-            } catch (e) {
-                console.warn('Primary html2canvas render failed, falling back to text-only snapshot.', e);
-            }
-
-            if (!canvas) {
-                // Fallback: build a minimal, safe text snapshot
-                const safe = document.createElement('div');
-                safe.style.position = 'absolute';
-                safe.style.left = '-9999px';
-                safe.style.top = '0';
-                safe.style.width = (input.offsetWidth || 800) + 'px';
-                safe.style.padding = '28px';
-                safe.style.background = '#ffffff';
-                safe.style.color = '#0f172a';
-                safe.style.fontFamily = 'Inter, Arial, Helvetica, sans-serif';
-                safe.style.fontSize = '13px';
-                safe.style.lineHeight = '1.45';
-                safe.style.whiteSpace = 'pre-wrap';
-
-                const title = document.createElement('div');
-                title.style.display = 'flex';
-                title.style.justifyContent = 'space-between';
-                title.style.alignItems = 'baseline';
-                title.style.marginBottom = '18px';
-
-                const h = document.createElement('h1');
-                h.textContent = data.projectName || 'Untitled Brief';
-                h.style.fontSize = '20px';
-                h.style.margin = '0';
-                h.style.fontWeight = '700';
-                h.style.color = '#0b1220';
-
-                const meta = document.createElement('div');
-                meta.style.fontSize = '12px';
-                meta.style.color = '#475569';
-                const creator = data.clientName || (data.userRole ? `${data.userRole}` : 'Unknown');
-                const created = new Date().toLocaleString();
-                meta.textContent = `Created by ${creator} • ${created}`;
-
-                title.appendChild(h);
-                title.appendChild(meta);
-
-                const content = document.createElement('div');
-                content.style.border = '1px solid #e6edf3';
-                content.style.padding = '16px';
-                content.style.borderRadius = '6px';
-                content.style.background = '#ffffff';
-                content.style.color = '#0b1220';
-
-                const addSection = (label: string, text: string | null | undefined, isMainSection = false) => {
-                    if (!text) return;
-                    const wrap = document.createElement('div');
-                    wrap.style.marginBottom = isMainSection ? '20px' : '14px';
-                    wrap.style.paddingBottom = isMainSection ? '12px' : '0';
-                    wrap.style.borderBottom = isMainSection ? '2px solid #e0e7ff' : 'none';
-                    
-                    const lh = document.createElement('div');
-                    lh.textContent = label;
-                    lh.style.fontWeight = isMainSection ? '700' : '600';
-                    lh.style.fontSize = isMainSection ? '15px' : '13px';
-                    lh.style.marginBottom = '8px';
-                    lh.style.color = isMainSection ? '#4f46e5' : '#1e293b';
-                    lh.style.textTransform = isMainSection ? 'uppercase' : 'none';
-                    lh.style.letterSpacing = isMainSection ? '0.5px' : 'normal';
-                    
-                    const p = document.createElement('div');
-                    p.textContent = text;
-                    p.style.whiteSpace = 'pre-wrap';
-                    p.style.color = '#475569';
-                    p.style.lineHeight = '1.6';
-                    wrap.appendChild(lh);
-                    wrap.appendChild(p);
-                    content.appendChild(wrap);
-                };
-
-                // Project Details Section
-                addSection('Project Overview', data.projectName ? `${data.projectName}${data.projectType ? ' - ' + data.projectType : ''}` : data.projectType, true);
-                addSection('Brief', data.overview);
-                addSection('Key Objectives', data.objectives);
-                addSection('Target Audience', data.audience);
-                
-                // Shoot Details Section
-                if (data.shootDates || data.location) {
-                    addSection('Shoot Details', '', true);
-                    addSection('Date', data.shootDates ? `${data.shootDates}${data.shootStartTime ? ' (Start: ' + data.shootStartTime + ')' : ''}` : undefined);
-                    addSection('Location', data.location);
-                }
-                
-                // Deliverables Section
-                if (Array.isArray(data.deliverables) && data.deliverables.length) {
-                    addSection('Deliverables', '', true);
-                    addSection('Required Assets', data.deliverables.join(', '));
-                    if (data.fileTypes?.length) addSection('File Formats', data.fileTypes.join(', '));
-                    if (data.usageRights?.length) addSection('Usage Rights', data.usageRights.join(', '));
-                }
-                
-                // Shot List Section
-                if (Array.isArray(data.shotList) && data.shotList.length) {
-                    addSection('Shot List', '', true);
-                    const shotSummary = data.shotList.map((s, i) => {
-                        const priority = s.priority ? '⭐ ' : '';
-                        const qty = s.quantity && s.quantity > 1 ? ` (×${s.quantity})` : '';
-                        return `${i + 1}. ${priority}${s.description}${qty}`;
-                    }).join('\n');
-                    addSection('Shots', shotSummary);
-                }
-                
-                // Budget Section
-                if (data.budgetEstimate) {
-                    addSection('Budget', '', true);
-                    addSection('Estimated Total', `${new Intl.NumberFormat(undefined, { style: 'currency', currency: data.currency || 'USD' }).format(data.budgetEstimate.total)}`);
-                }
-
-                safe.appendChild(title);
-                safe.appendChild(content);
-                document.body.appendChild(safe);
-                try {
-                    canvas = await html2canvasFunc(safe, { scale: 2, backgroundColor: '#ffffff' });
-                } finally {
-                    try { document.body.removeChild(safe); } catch {}
-                }
-            }
-
-            if (!canvas) {
-                throw new Error('Failed to render canvas for PDF generation');
-            }
-
-            const imgData = canvas.toDataURL('image/png');
-            const PDFClass = jsPDFConstructor.jsPDF ? jsPDFConstructor.jsPDF : jsPDFConstructor;
-            const pdf = new PDFClass();
-
-            const pdfWidth = pdf.internal.pageSize.getWidth();
-            const pdfHeight = pdf.internal.pageSize.getHeight();
-            const ratio = canvas.width / canvas.height;
-            let finalWidth = pdfWidth;
-            let finalHeight = finalWidth / ratio;
-            if (finalHeight > pdfHeight) { finalHeight = pdfHeight; finalWidth = finalHeight * ratio; }
-
-            pdf.addImage(imgData, 'PNG', 0, 0, finalWidth, finalHeight);
-            pdf.save(`brief-${data.projectName?.replace(/\s+/g, '-') || 'download'}.pdf`);
+            await generateEnhancedPDF(data as any, briefContentRef.current, {
+                includeCoverPage: true,
+                includeWatermark: false,
+                brandColor: '#4f46e5',
+            });
         } catch (err) {
             console.error('Error generating PDF:', err);
             alert('Failed to generate PDF. See console for details.');
         }
     };
 
-    const handleShare = () => {
-        try {
-            // Encode the brief data for sharing
-            const jsonStr = JSON.stringify(data);
-            const encodedData = btoa(jsonStr);
-            
-            // Create a unique token (optional, for aesthetics)
-            const token = Math.random().toString(36).substring(2, 10);
-            
-            // Build the share URL with encoded data
-            const link = `${window.location.origin}/share/${token}?d=${encodedData}`;
-            
-            setShareLink(link);
-            setShareModalOpen(true);
-        } catch (error) {
-            console.error('Error creating share link:', error);
-            alert('Failed to create share link. The brief data may be too large.');
-        }
-    };
-
-    const copyToClipboard = () => {
-        const el = shareLinkRef.current; if (!el) return; el.select(); document.execCommand('copy');
+    const handleSendEmail = () => {
+        const rawSelf = includeSelf && data.clientEmail ? [data.clientEmail] : [];
+        const others = additionalRecipients.split(',').map(s => s.trim()).filter(Boolean);
+        const recipients = Array.from(new Set([...rawSelf, ...others]));
+        if (!recipients.length) { alert('Please select "Send to my email" or add at least one recipient.'); return; }
+        setIsSending(true);
+        (async () => {
+            try {
+                const htmlContent = briefContentRef.current?.outerHTML || JSON.stringify(data, null, 2);
+                const resp = await fetch('/api/email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ recipients, subject: `Brief: ${data.projectName || 'Untitled'}`, html: htmlContent }) });
+                const json = await resp.json();
+                if (!resp.ok) { console.error('Email send failed:', json); alert(`Failed to send email: ${json?.error || resp.statusText}`); }
+                else { alert('Email sent successfully'); setEmailModalOpen(false); setAdditionalRecipients(''); }
+            } catch (err) { console.error('Error sending email:', err); alert('Failed to send email.'); }
+            finally { setIsSending(false); }
+        })();
     };
 
     const handleAnalyzeBrief = async () => {
@@ -1217,24 +1046,6 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
         } finally {
             setIsAnalyzing(false);
         }
-    };
-
-    const handleSendEmail = () => {
-        const rawSelf = includeSelf && data.clientEmail ? [data.clientEmail] : [];
-        const others = additionalRecipients.split(',').map(s => s.trim()).filter(Boolean);
-        const recipients = Array.from(new Set([...rawSelf, ...others]));
-        if (!recipients.length) { alert('Please select "Send to my email" or add at least one recipient.'); return; }
-        setIsSending(true);
-        (async () => {
-            try {
-                const htmlContent = briefContentRef.current?.outerHTML || JSON.stringify(data, null, 2);
-                const resp = await fetch('/api/email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ recipients, subject: `Brief: ${data.projectName || 'Untitled'}`, html: htmlContent }) });
-                const json = await resp.json();
-                if (!resp.ok) { console.error('Email send failed:', json); alert(`Failed to send email: ${json?.error || resp.statusText}`); }
-                else { alert('Email sent successfully'); setEmailModalOpen(false); setAdditionalRecipients(''); }
-            } catch (err) { console.error('Error sending email:', err); alert('Failed to send email.'); }
-            finally { setIsSending(false); }
-        })();
     };
 
     return (
@@ -1459,7 +1270,6 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
                 <button onClick={handleAnalyzeBrief} disabled={isAnalyzing} className="w-full md:w-auto px-4 py-2 bg-purple-600 text-white font-semibold rounded-md hover:bg-purple-700 disabled:bg-gray-400 transition-colors shadow-sm">
                     {isAnalyzing ? '🤖 Analyzing...' : '🤖 AI Review Brief'}
                 </button>
-                <button onClick={handleShare} className="w-full md:w-auto px-4 py-2 bg-gray-100 text-gray-800 font-semibold rounded-md hover:bg-gray-200 transition-colors">Share Link</button>
                 <button onClick={handleDownloadPdf} className="w-full md:w-auto px-4 py-2 bg-gray-100 text-gray-800 font-semibold rounded-md hover:bg-gray-200 transition-colors">Download PDF</button>
                 <button onClick={() => setEmailModalOpen(true)} className="w-full md:w-auto px-4 py-2 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 transition-colors shadow-sm">Email Brief</button>
             </div>
@@ -1493,18 +1303,8 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
                 </div>
             </Modal>
 
-            <Modal isOpen={isShareModalOpen} onClose={() => setShareModalOpen(false)} title="Share Your Brief">
-                               <div className="space-y-4">
-                    <p className="text-gray-700 text-sm">Share this link with anyone you want to collaborate with. They will be able to view the brief.</p>
-                    <div className="relative">
-                        <input ref={shareLinkRef} type="text" value={shareLink} readOnly className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
-                        <button onClick={copyToClipboard} className="absolute right-2 top-2 px-3 py-1.5 bg-indigo-600 text-white text-sm font-semibold rounded-md hover:bg-indigo-700 transition-colors">Copy Link</button>
-                    </div>
-                    <div className="flex justify-end">
-                        <button onClick={() => setShareModalOpen(false)} className="px-4 py-2 bg-gray-200 text-gray-700 font-semibold rounded-md hover:bg-gray-300 transition-colors">Close</button>
-                    </div>
-                </div>
-            </Modal>
+            {/* Removed Share Modal */}
+            {/* <Modal isOpen={isShareModalOpen} ...> ... </Modal> */}
 
             <Modal isOpen={isAnalysisModalOpen} onClose={() => setAnalysisModalOpen(false)} title="🤖 AI Brief Analysis">
                 <div className="space-y-6 max-h-96 overflow-y-auto">
