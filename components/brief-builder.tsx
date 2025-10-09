@@ -1011,18 +1011,42 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
             pdfContent.style.left = '-9999px';
             
             try {
-                // Force all modern color values to standard RGB
-                console.log('Converting color values...');
-                const styleElements = pdfContent.querySelectorAll('*[style]');
-                styleElements.forEach(el => {
-                    const style = (el as HTMLElement).style;
-                    if (style.color?.includes('oklch')) {
-                        style.color = window.getComputedStyle(el).color;
-                    }
-                    if (style.backgroundColor?.includes('oklch')) {
-                        style.backgroundColor = window.getComputedStyle(el).backgroundColor;
-                    }
-                });
+                // Convert all colors to RGB format
+                console.log('Converting all colors to RGB format...');
+                const convertToRGB = (element: Element) => {
+                    const el = element as HTMLElement;
+                    const computed = window.getComputedStyle(el);
+                    
+                    // Helper to safely get RGB color
+                    const getRGBColor = (color: string) => {
+                        // Create a temporary element to compute the color
+                        const temp = document.createElement('div');
+                        temp.style.color = color;
+                        temp.style.display = 'none';
+                        document.body.appendChild(temp);
+                        const rgb = window.getComputedStyle(temp).color;
+                        document.body.removeChild(temp);
+                        return rgb;
+                    };
+
+                    // Convert all color properties
+                    const colorProps = ['color', 'backgroundColor', 'borderColor'];
+                    colorProps.forEach(prop => {
+                        const value = computed[prop as any];
+                        if (value && value !== 'rgba(0, 0, 0, 0)') {
+                            try {
+                                el.style[prop as any] = getRGBColor(value);
+                            } catch (e) {
+                                console.warn(`Failed to convert ${prop}:`, e);
+                            }
+                        }
+                    });
+                };
+
+                // Convert colors for all elements
+                const allElements = pdfContent.getElementsByTagName('*');
+                Array.from(allElements).forEach(convertToRGB);
+                convertToRGB(pdfContent); // Don't forget the container itself
                 
                 // Ensure all images are loaded
                 console.log('Waiting for images to load...');
@@ -1117,11 +1141,10 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
             <p className="text-gray-600">Please review all the details below. Once you&apos;re happy, choose how you&apos;d like to share or save the document.</p>
 
             <div id="brief-content-for-pdf" ref={briefContentRef} style={{
-                padding: '1.5rem',
-                backgroundColor: '#ffffff',
-                borderRadius: '0.5rem',
-                border: '1px solid #e5e7eb',
-                marginBottom: '1.5rem'
+                padding: '24px',
+                backgroundColor: 'rgb(255, 255, 255)',
+                border: '1px solid rgb(229, 231, 235)',
+                marginBottom: '24px'
             }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.5rem' }}>
                     <h1 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#111827' }}>{data.projectName || 'Untitled Brief'}</h1>
