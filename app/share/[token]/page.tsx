@@ -110,8 +110,10 @@ export default function SharePage() {
           <InfoRow label="Budget" value={briefData.budget} />
           <InfoRow label="Objectives" value={briefData.objectives} />
           <InfoRow label="Target Audience" value={briefData.audience} />
-          {briefData.brandGuidelines && <InfoRow label="Brand Guidelines" value={briefData.brandGuidelines} link />}
+          {briefData.brandGuidelines && <InfoRow label="Brand Guidelines" value={briefData.brandGuidelines} />}
           {briefData.styleReferences && <InfoRow label="Style References" value={briefData.styleReferences} />}
+          {briefData.competitorNotes && <InfoRow label="Competitor Notes" value={briefData.competitorNotes} />}
+          {briefData.legalRequirements && <InfoRow label="Legal Requirements" value={briefData.legalRequirements} />}
         </Section>
 
         {/* Shoot Details */}
@@ -124,15 +126,23 @@ export default function SharePage() {
             <InfoRow label="Location" value={briefData.location} />
             {briefData.locationDetails && (
               <>
+                <InfoRow label="Address" value={briefData.locationDetails.address} />
                 <InfoRow label="Parking" value={briefData.locationDetails.parkingInfo} />
                 <InfoRow label="Access Notes" value={briefData.locationDetails.accessNotes} />
+                {(briefData.locationDetails.sunrise || briefData.locationDetails.sunset) && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <InfoRow label="Sunrise" value={briefData.locationDetails.sunrise} />
+                    <InfoRow label="Sunset" value={briefData.locationDetails.sunset} />
+                  </div>
+                )}
+                <InfoRow label="Weather" value={briefData.locationDetails.weatherSummary} />
               </>
             )}
           </Section>
         )}
 
         {/* Logistics */}
-        {(briefData.permitsRequired || briefData.insuranceDetails || briefData.safetyProtocols) && (
+        {(briefData.permitsRequired || briefData.insuranceDetails || briefData.safetyProtocols || briefData.transportationDetails || briefData.accommodationDetails) && (
           <Section title="Production Logistics">
             <InfoRow label="Permits Required" value={briefData.permitsRequired} />
             <InfoRow label="Insurance" value={briefData.insuranceDetails} />
@@ -141,6 +151,8 @@ export default function SharePage() {
             <InfoRow label="Power Requirements" value={briefData.powerRequirements} />
             <InfoRow label="Internet Needed" value={briefData.internetRequired ? 'Yes' : 'No'} />
             <InfoRow label="Catering" value={briefData.cateringNotes} />
+            <InfoRow label="Transportation" value={briefData.transportationDetails} />
+            <InfoRow label="Accommodation" value={briefData.accommodationDetails} />
           </Section>
         )}
 
@@ -167,6 +179,25 @@ export default function SharePage() {
             {briefData.fileTypes && briefData.fileTypes.length > 0 && (
               <InfoRow label="File Formats" value={briefData.fileTypes.join(', ')} />
             )}
+            {briefData.usageRights && briefData.usageRights.length > 0 && (
+              <InfoRow label="Usage Rights" value={briefData.usageRights.join(', ')} />
+            )}
+            {briefData.socialPlatforms && briefData.socialPlatforms.length > 0 && (
+              <InfoRow label="Social Platforms" value={briefData.socialPlatforms.join(', ')} />
+            )}
+          </Section>
+        )}
+
+        {/* Video Specifications */}
+        {(briefData.videoDuration || briefData.videoFrameRate || briefData.videoResolution || briefData.videoOrientation || briefData.motionRequirements) && (
+          <Section title="📹 Video Specifications">
+            <InfoRow label="Duration" value={briefData.videoDuration} />
+            <InfoRow label="Frame Rate" value={briefData.videoFrameRate} />
+            <InfoRow label="Resolution" value={briefData.videoResolution} />
+            {briefData.videoOrientation && briefData.videoOrientation.length > 0 && (
+              <InfoRow label="Orientations" value={briefData.videoOrientation.join(', ')} />
+            )}
+            <InfoRow label="Motion Requirements" value={briefData.motionRequirements} />
           </Section>
         )}
 
@@ -183,24 +214,44 @@ export default function SharePage() {
 
         {/* Shot List */}
         {briefData.shotList && briefData.shotList.length > 0 && (
-          <Section title="Shot List">
+          <Section title={`Shot List (${briefData.shotList.length} shots)`}>
             <div className="space-y-3">
               {briefData.shotList.map((shot, idx) => (
                 <div key={shot.id} className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                   <div className="flex items-start justify-between mb-2">
-                    <div>
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold text-gray-900 dark:text-white">Shot {idx + 1}</span>
+                      {shot.quantity && shot.quantity > 1 && (
+                        <span className="text-xs font-semibold text-gray-600 bg-gray-200 dark:bg-gray-600 dark:text-gray-200 px-2 py-0.5 rounded">×{shot.quantity}</span>
+                      )}
+                      {shot.category && (
+                        <span className="text-xs text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-800 px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600">{shot.category}</span>
+                      )}
                       {shot.priority && (
-                        <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-1 rounded">Priority</span>
+                        <span className="text-xs bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 px-2 py-1 rounded">Priority</span>
                       )}
                     </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                      {shot.shotType} • {shot.angle}
-                    </div>
                   </div>
-                  <p className="text-gray-700 dark:text-gray-300">{shot.description}</p>
+                  <p className="text-gray-700 dark:text-gray-300 mb-2">{shot.description}</p>
+                  <div className="flex flex-wrap gap-2 text-xs text-gray-600 dark:text-gray-400">
+                    <span>{shot.shotType}</span>
+                    <span>•</span>
+                    <span>{shot.angle}</span>
+                    {shot.orientation && (
+                      <>
+                        <span>•</span>
+                        <span>{shot.orientation}</span>
+                      </>
+                    )}
+                    {shot.equipment && shot.equipment.length > 0 && (
+                      <>
+                        <span>•</span>
+                        <span>Equipment: {shot.equipment.join(', ')}</span>
+                      </>
+                    )}
+                  </div>
                   {shot.notes && (
-                    <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">{shot.notes}</p>
+                    <p className="mt-2 text-sm text-gray-600 dark:text-gray-400 italic">Notes: {shot.notes}</p>
                   )}
                 </div>
               ))}

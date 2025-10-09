@@ -43,6 +43,18 @@ interface FormData {
   shootFinishTime?: string;
   shootStatus?: string;
   location?: string;
+  locationDetails?: {
+    address?: string;
+    lat?: number;
+    lon?: number;
+    parkingInfo?: string;
+    accessNotes?: string;
+    sunrise?: string;
+    sunset?: string;
+    weatherSummary?: string;
+    nearestHospital?: string;
+    emergencyContact?: string;
+  };
   moodboardLink?: string;
   moodboardFiles?: File[];
   deliverables?: string[];
@@ -1251,6 +1263,16 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
                     </div>
                 )}
 
+                {(data.brandGuidelines || data.styleReferences || data.competitorNotes || data.legalRequirements) && (
+                    <div>
+                        <h3 className="text-lg font-semibold text-gray-800 mb-2">Brand & Creative Direction</h3>
+                        {data.brandGuidelines && <p className="mt-2 text-sm text-gray-700"><span className="font-medium">Brand Guidelines:</span><br/>{data.brandGuidelines}</p>}
+                        {data.styleReferences && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Style References:</span><br/>{data.styleReferences}</p>}
+                        {data.competitorNotes && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Competitor Notes:</span><br/>{data.competitorNotes}</p>}
+                        {data.legalRequirements && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Legal Requirements:</span><br/>{data.legalRequirements}</p>}
+                    </div>
+                )}
+
                 {(data.clientName || data.clientCompany || data.clientEmail || data.clientPhone) && (
                     <div>
                         <h3 className="text-lg font-semibold text-gray-800 mb-2">Contact</h3>
@@ -1263,7 +1285,7 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
                     </div>
                 )}
 
-                {(data.shootDates || data.shootStartTime || data.shootFinishTime || data.shootStatus || data.location) && (
+                {(data.shootDates || data.shootStartTime || data.shootFinishTime || data.shootStatus || data.location || data.locationDetails) && (
                     <div>
                         <h3 className="text-lg font-semibold text-gray-800 mb-2">Dates, Times & Location</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-700">
@@ -1273,6 +1295,16 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
                             {data.shootFinishTime && <div><span className="font-medium">Finish Time:</span> {data.shootFinishTime}</div>}
                         </div>
                         {data.location && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Location:</span> {data.location}</p>}
+                        {data.locationDetails?.address && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Address:</span> {data.locationDetails.address}</p>}
+                        {data.locationDetails?.parkingInfo && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Parking Info:</span> {data.locationDetails.parkingInfo}</p>}
+                        {data.locationDetails?.accessNotes && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Access Notes:</span> {data.locationDetails.accessNotes}</p>}
+                        {(data.locationDetails?.sunrise || data.locationDetails?.sunset) && (
+                            <div className="grid grid-cols-2 gap-2 mt-1 text-sm text-gray-700">
+                                {data.locationDetails.sunrise && <div><span className="font-medium">Sunrise:</span> {data.locationDetails.sunrise}</div>}
+                                {data.locationDetails.sunset && <div><span className="font-medium">Sunset:</span> {data.locationDetails.sunset}</div>}
+                            </div>
+                        )}
+                        {data.locationDetails?.weatherSummary && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Weather Summary:</span> {data.locationDetails.weatherSummary}</p>}
                     </div>
                 )}
 
@@ -1298,31 +1330,127 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
                     </div>
                 )}
 
+                {(data.videoDuration || data.videoFrameRate || data.videoResolution || data.videoOrientation?.length || data.motionRequirements) && (
+                    <div>
+                        <h3 className="text-lg font-semibold text-indigo-700 mb-2">📹 Video Specifications</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-700">
+                            {data.videoDuration && <div><span className="font-medium">Duration:</span> {data.videoDuration}</div>}
+                            {data.videoFrameRate && <div><span className="font-medium">Frame Rate:</span> {data.videoFrameRate}</div>}
+                            {data.videoResolution && <div><span className="font-medium">Resolution:</span> {data.videoResolution}</div>}
+                            {data.videoOrientation?.length ? <div><span className="font-medium">Orientations:</span> {data.videoOrientation.join(', ')}</div> : null}
+                        </div>
+                        {data.motionRequirements && <p className="mt-2 text-sm text-gray-700"><span className="font-medium">Motion Requirements:</span><br/>{data.motionRequirements}</p>}
+                    </div>
+                )}
+
+                {(data.permitsRequired || data.insuranceDetails || data.safetyProtocols || data.backupPlan || data.powerRequirements || data.internetRequired !== undefined || data.cateringNotes || data.transportationDetails || data.accommodationDetails) && (
+                    <div>
+                        <h3 className="text-lg font-semibold text-gray-800 mb-2">Production Logistics</h3>
+                        {data.permitsRequired && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Permits Required:</span><br/>{data.permitsRequired}</p>}
+                        {data.insuranceDetails && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Insurance Details:</span><br/>{data.insuranceDetails}</p>}
+                        {data.safetyProtocols && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Safety Protocols:</span><br/>{data.safetyProtocols}</p>}
+                        {data.backupPlan && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Backup Plan:</span><br/>{data.backupPlan}</p>}
+                        {data.powerRequirements && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Power Requirements:</span> {data.powerRequirements}</p>}
+                        {data.internetRequired !== undefined && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Internet Required:</span> {data.internetRequired ? 'Yes' : 'No'}</p>}
+                        {data.cateringNotes && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Catering Notes:</span><br/>{data.cateringNotes}</p>}
+                        {data.transportationDetails && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Transportation:</span><br/>{data.transportationDetails}</p>}
+                        {data.accommodationDetails && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Accommodation:</span><br/>{data.accommodationDetails}</p>}
+                    </div>
+                )}
+
+                {(data.editingRequirements || data.colorGradingNotes || data.turnaroundTime || data.revisionRounds || data.finalDeliveryFormat) && (
+                    <div>
+                        <h3 className="text-lg font-semibold text-gray-800 mb-2">Post-Production</h3>
+                        {data.editingRequirements && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Editing Requirements:</span><br/>{data.editingRequirements}</p>}
+                        {data.colorGradingNotes && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Color Grading Notes:</span><br/>{data.colorGradingNotes}</p>}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2 text-sm text-gray-700">
+                            {data.turnaroundTime && <div><span className="font-medium">Turnaround Time:</span> {data.turnaroundTime}</div>}
+                            {data.revisionRounds && <div><span className="font-medium">Revision Rounds:</span> {data.revisionRounds}</div>}
+                        </div>
+                        {data.finalDeliveryFormat && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Final Delivery Format:</span> {data.finalDeliveryFormat}</p>}
+                    </div>
+                )}
+
                 {data.shotList?.length ? (
                     <div>
-                        <h3 className="text-lg font-semibold text-gray-800 mb-2">Shot List</h3>
+                        <h3 className="text-lg font-semibold text-gray-800 mb-2">Shot List ({data.shotList.length} shots)</h3>
                         <div className="space-y-2">
                             {data.shotList.map((shot, i) => (
                                 <div key={shot.id} className="p-3 bg-gray-50 border border-gray-200 rounded-md">
                                     <div className="flex items-center justify-between">
-                                        <p className="font-semibold text-gray-800">Shot #{i + 1}</p>
+                                        <div className="flex items-center gap-2">
+                                            <p className="font-semibold text-gray-800">Shot #{i + 1}</p>
+                                            {shot.quantity && shot.quantity > 1 && (
+                                                <span className="text-xs font-semibold text-gray-600 bg-gray-200 px-2 py-0.5 rounded">×{shot.quantity}</span>
+                                            )}
+                                            {shot.category && (
+                                                <span className="text-xs text-gray-600 bg-white px-2 py-0.5 rounded border border-gray-300">{shot.category}</span>
+                                            )}
+                                        </div>
                                         {shot.priority && <span className="ml-2 text-xs font-bold text-indigo-600 bg-indigo-100 px-2 py-1 rounded-full">MUST-HAVE</span>}
                                     </div>
                                     <p className="mt-1 text-sm text-gray-700">{shot.description}</p>
-                                    <p className="text-xs text-gray-500">{shot.shotType} | {shot.angle} {shot.notes && `| ${shot.notes}`}</p>
+                                    <div className="mt-1 flex flex-wrap gap-2 text-xs text-gray-500">
+                                        <span>{shot.shotType}</span>
+                                        <span>•</span>
+                                        <span>{shot.angle}</span>
+                                        {shot.orientation && (
+                                            <>
+                                                <span>•</span>
+                                                <span>{shot.orientation}</span>
+                                            </>
+                                        )}
+                                        {shot.equipment && shot.equipment.length > 0 && (
+                                            <>
+                                                <span>•</span>
+                                                <span>Equipment: {shot.equipment.join(', ')}</span>
+                                            </>
+                                        )}
+                                    </div>
+                                    {shot.notes && <p className="mt-1 text-xs text-gray-600 italic">Notes: {shot.notes}</p>}
                                 </div>
                             ))}
                         </div>
                     </div>
                 ) : null}
 
-                {(data.schedule || data.emergencyContact || data.nearestHospital || data.notes) && (
+                {data.crew?.length ? (
                     <div>
-                        <h3 className="text-lg font-semibold text-gray-800 mb-2">Logistics</h3>
-                        {data.schedule && <p className="text-sm text-gray-700"><span className="font-medium">Schedule:</span> {data.schedule}</p>}
-                        {data.emergencyContact && <p className="text-sm text-gray-700"><span className="font-medium">Emergency Contact:</span> {data.emergencyContact}</p>}
-                        {data.nearestHospital && <p className="text-sm text-gray-700"><span className="font-medium">Nearest Hospital:</span> {data.nearestHospital}</p>}
-                        {data.notes && <p className="text-sm text-gray-700"><span className="font-medium">Notes:</span> {data.notes}</p>}
+                        <h3 className="text-lg font-semibold text-gray-800 mb-2">Crew ({data.crew.length})</h3>
+                        <div className="space-y-2">
+                            {data.crew.map((member) => (
+                                <div key={member.id} className="p-2 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-700">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <p className="font-semibold">{member.name}</p>
+                                            <p className="text-xs text-gray-600">{member.role}</p>
+                                        </div>
+                                        <div className="text-right text-xs">
+                                            {member.callTime && <p>Call: {member.callTime}</p>}
+                                            {member.contact && <p className="text-gray-500">{member.contact}</p>}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ) : null}
+
+                {(data.schedule || data.emergencyContact || data.nearestHospital || data.locationDetails?.emergencyContact || data.locationDetails?.nearestHospital || data.notes) && (
+                    <div>
+                        <h3 className="text-lg font-semibold text-gray-800 mb-2">Call Sheet & Safety</h3>
+                        {data.schedule && <p className="text-sm text-gray-700"><span className="font-medium">Schedule:</span><br/>{data.schedule}</p>}
+                        {(data.emergencyContact || data.locationDetails?.emergencyContact) && (
+                            <p className="mt-1 text-sm text-gray-700">
+                                <span className="font-medium">Emergency Contact:</span> {data.emergencyContact || data.locationDetails?.emergencyContact}
+                            </p>
+                        )}
+                        {(data.nearestHospital || data.locationDetails?.nearestHospital) && (
+                            <p className="mt-1 text-sm text-gray-700">
+                                <span className="font-medium">Nearest Hospital:</span> {data.nearestHospital || data.locationDetails?.nearestHospital}
+                            </p>
+                        )}
+                        {data.notes && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Notes:</span><br/>{data.notes}</p>}
                     </div>
                 )}
             </div>
