@@ -26,21 +26,47 @@ export async function generateEnhancedPDF(
   } = options;
 
   try {
+    console.log('Starting PDF generation...');
+    
     // Dynamic imports
+    console.log('Loading PDF generation modules...');
     const [jsPDFModule, html2canvasModule] = await Promise.all([
-      import('jspdf'),
-      import('html2canvas'),
+      import('jspdf').catch(e => {
+        console.error('Failed to load jspdf:', e);
+        throw new Error('Failed to load PDF generation module: ' + e.message);
+      }),
+      import('html2canvas').catch(e => {
+        console.error('Failed to load html2canvas:', e);
+        throw new Error('Failed to load HTML capture module: ' + e.message);
+      }),
     ]);
 
+    console.log('Modules loaded, initializing...');
     const jsPDF = jsPDFModule.jsPDF || (jsPDFModule as any).default;
-    const html2canvas = html2canvasModule.default || html2canvasModule;
+    if (!jsPDF) {
+      throw new Error('Failed to initialize jsPDF');
+    }
 
+    const html2canvas = html2canvasModule.default || html2canvasModule;
+    if (!html2canvas) {
+      throw new Error('Failed to initialize html2canvas');
+    }
+    
+    console.log('Modules initialized successfully');
+
+    console.log('Creating new PDF document...');
     const pdf = new jsPDF('p', 'mm', 'a4');
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
     const margin = 15;
 
+    console.log('PDF document created, dimensions:', { pageWidth, pageHeight, margin });
     let currentY = margin;
+
+    // Add basic font to ensure text rendering
+    console.log('Configuring PDF settings...');
+    pdf.setFont('Helvetica', 'normal');
+    pdf.setFontSize(12);
 
     // Helper to add header/footer with improved styling
     const addHeaderFooter = (pageNum: number, totalPages: number) => {

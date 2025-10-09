@@ -992,41 +992,77 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
 
     const handleDownloadPdf = async () => {
         try {
+            console.log('Starting PDF download process...');
+            
             if (!briefContentRef.current) {
                 throw new Error('Content element not found. Please ensure all content is loaded.');
             }
+            
+            console.log('Content element found, preparing for PDF generation...');
             
             // Give time for any dynamic content to render
             await new Promise(resolve => setTimeout(resolve, 500));
             
             // Create a clone of the content for PDF generation
+            console.log('Creating content clone...');
             const pdfContent = briefContentRef.current.cloneNode(true) as HTMLElement;
+            document.body.appendChild(pdfContent);
+            pdfContent.style.position = 'absolute';
+            pdfContent.style.left = '-9999px';
             
-            // Force all modern color values to standard RGB
-            const styleElements = pdfContent.querySelectorAll('*[style]');
-            styleElements.forEach(el => {
-                const style = (el as HTMLElement).style;
-                if (style.color?.includes('oklch')) {
-                    style.color = window.getComputedStyle(el).color;
-                }
-                if (style.backgroundColor?.includes('oklch')) {
-                    style.backgroundColor = window.getComputedStyle(el).backgroundColor;
-                }
-            });
-            
-            // Ensure the element is visible
-            pdfContent.style.display = 'block';
-            pdfContent.style.visibility = 'visible';
-            
-            await generateEnhancedPDF(data as any, pdfContent, {
-                includeCoverPage: true,
-                includeWatermark: false,
-                brandColor: '#4f46e5',
-            });
+            try {
+                // Force all modern color values to standard RGB
+                console.log('Converting color values...');
+                const styleElements = pdfContent.querySelectorAll('*[style]');
+                styleElements.forEach(el => {
+                    const style = (el as HTMLElement).style;
+                    if (style.color?.includes('oklch')) {
+                        style.color = window.getComputedStyle(el).color;
+                    }
+                    if (style.backgroundColor?.includes('oklch')) {
+                        style.backgroundColor = window.getComputedStyle(el).backgroundColor;
+                    }
+                });
+                
+                // Ensure all images are loaded
+                console.log('Waiting for images to load...');
+                const images = Array.from(pdfContent.getElementsByTagName('img'));
+                await Promise.all(
+                    images.map(img => 
+                        img.complete 
+                            ? Promise.resolve() 
+                            : new Promise((resolve, reject) => {
+                                img.onload = resolve;
+                                img.onerror = reject;
+                            })
+                    )
+                );
+                
+                // Ensure the element is visible and styled
+                console.log('Setting up element visibility...');
+                pdfContent.style.display = 'block';
+                pdfContent.style.visibility = 'visible';
+                pdfContent.style.width = '800px'; // Set a fixed width for consistent rendering
+                
+                console.log('Generating PDF...');
+                await generateEnhancedPDF(data as any, pdfContent, {
+                    includeCoverPage: true,
+                    includeWatermark: false,
+                    brandColor: '#4f46e5',
+                });
+                
+                console.log('PDF generation complete');
+            } finally {
+                // Clean up the cloned element
+                document.body.removeChild(pdfContent);
+            }
         } catch (err) {
             console.error('Error generating PDF:', err);
-            const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-            alert(`Failed to generate PDF: ${errorMessage}`);
+            const errorMessage = err instanceof Error 
+                ? `${err.message}\n${err.stack}` 
+                : 'Unknown error';
+            console.error('Detailed error:', errorMessage);
+            alert(`Failed to generate PDF: ${err instanceof Error ? err.message : 'Unknown error'}\nCheck console for details.`);
         }
     };
 
