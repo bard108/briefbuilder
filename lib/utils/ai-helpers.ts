@@ -1,4 +1,7 @@
-import type { FormData, Shot } from '../schemas/brief-schema';
+import type { FormData as SchemaFormData, Shot } from '../schemas/brief-schema';
+
+// Make FormData more flexible to accept partial data
+type FormData = Partial<SchemaFormData>;
 
 export async function callGeminiAPI(
   prompt: string,
@@ -74,13 +77,39 @@ Keep response concise and practical.`;
   return await callGeminiAPI(prompt);
 }
 
-// Generate ideas from project name
-export async function generateProjectIdeas(projectName: string): Promise<{ overview?: string; objectives?: string[] } | null> {
-  const prompt = `Based on the project name "${projectName}", generate:
+// Generate ideas from project name with context
+export async function generateProjectIdeas(
+  projectName: string,
+  context?: {
+    projectType?: string;
+    budget?: string;
+    audience?: string;
+    brandGuidelines?: string;
+    styleReferences?: string;
+  }
+): Promise<{ overview?: string; objectives?: string[] } | null> {
+  let prompt = `Based on the project name "${projectName}"`;
+  
+  // Add context if available
+  if (context?.projectType) prompt += `, which is a ${context.projectType} project`;
+  if (context?.budget) prompt += ` with a budget of ${context.budget}`;
+  if (context?.audience) prompt += ` targeting ${context.audience}`;
+  
+  prompt += `, generate:
 1. A concise, one-paragraph project overview (2-3 sentences)
-2. A list of 3-4 key objectives
+2. A list of 3-4 key objectives`;
 
-Return as JSON: { "overview": "...", "objectives": ["...", "..."] }`;
+  if (context?.brandGuidelines) {
+    prompt += `\n\nBrand Guidelines: ${context.brandGuidelines}`;
+    prompt += `\nEnsure recommendations align with the brand guidelines.`;
+  }
+  
+  if (context?.styleReferences) {
+    prompt += `\n\nStyle References: ${context.styleReferences}`;
+    prompt += `\nConsider these style references in your suggestions.`;
+  }
+
+  prompt += `\n\nReturn as JSON: { "overview": "...", "objectives": ["...", "..."] }`;
 
   const schema = {
     type: 'OBJECT',
@@ -105,20 +134,41 @@ Return as JSON: { "overview": "...", "objectives": ["...", "..."] }`;
 
 // Generate shot list from brief context
 export async function generateShotList(data: FormData): Promise<Shot[] | null> {
-  const prompt = `You are a helpful assistant for photographers. Based on this brief, generate a detailed shot list of 5-7 ideas:
+  let prompt = `You are an expert photography director. Based on this brief, generate a detailed shot list of 5-7 diverse, strategic ideas:
 
 Project Name: "${data.projectName || 'Not specified'}"
 Project Type: "${data.projectType || 'Not specified'}"
 Overview: "${data.overview || 'Not specified'}"
 Objectives: "${data.objectives || 'Not specified'}"
+Target Audience: "${data.audience || 'Not specified'}"`;
 
-Return as JSON array with objects containing:
-- description (string)
-- shotType (one of: "Wide", "Medium", "Close-up", "Detail", "Overhead")
-- angle (one of: "Eye-level", "High Angle", "Low Angle")
-- notes (string, can be empty)
-- category (string, e.g., "Hero", "Details", "Lifestyle")
-- estimatedTime (number in minutes)`;
+  // Add brand context
+  if (data.brandGuidelines) {
+    prompt += `\n\nBrand Guidelines: ${data.brandGuidelines}`;
+    prompt += `\nEnsure all shots align with brand visual identity.`;
+  }
+
+  if (data.styleReferences) {
+    prompt += `\n\nStyle References: ${data.styleReferences}`;
+    prompt += `\nConsider these visual references for inspiration.`;
+  }
+
+  // Check for existing shots to avoid duplicates
+  if (data.shotList && data.shotList.length > 0) {
+    const existingDescriptions = data.shotList.map(s => s.description).join('; ');
+    prompt += `\n\nExisting shots (avoid duplicates): ${existingDescriptions}`;
+  }
+
+  prompt += `\n\nFor each shot, provide:
+- description: Clear, specific shot description
+- shotType: One of "Wide", "Medium", "Close-up", "Detail", "Overhead"
+- angle: One of "Eye-level", "High Angle", "Low Angle", "Dutch Angle"
+- notes: Technical notes, lighting suggestions, or creative direction
+- category: Shot category (e.g., "Hero", "Details", "Lifestyle", "Product", "Atmosphere")
+- estimatedTime: Estimated minutes to capture
+- priority: Boolean - is this a must-have shot based on objectives?
+
+Return as JSON array.`;
 
   const schema = {
     type: 'ARRAY',
@@ -131,6 +181,7 @@ Return as JSON array with objects containing:
         notes: { type: 'STRING' },
         category: { type: 'STRING' },
         estimatedTime: { type: 'NUMBER' },
+        priority: { type: 'BOOLEAN' },
       },
       required: ['description', 'shotType', 'angle', 'notes'],
     },
@@ -143,9 +194,9 @@ Return as JSON array with objects containing:
       return shots.map((shot: any, index: number) => ({
         ...shot,
         id: Date.now() + index,
-        priority: false,
+        priority: shot.priority || false,
         status: 'Not Started',
-        order: index + 1,
+        order: (data.shotList?.length || 0) + index + 1,
         equipment: [],
       }));
     } catch (e) {
@@ -161,21 +212,50 @@ export async function generateShotsFromImages(
   data: FormData,
   imageDataUrls: string[]
 ): Promise<Shot[] | null> {
-  const prompt = `You are an expert photo art director. Based on the uploaded reference images and this brief context:
+  let prompt = `You are an expert photo art director. Analyze the uploaded reference images and extract:
+
+1. Visual Style: Lighting, composition, color palette, mood
+2. Technical Approach: Camera angles, framing, depth of field
+3. Key Elements: What makes these images effective
+
+Based on these reference images and this brief context:
 
 Project: ${data.projectName || 'Untitled'}
+Project Type: ${data.projectType || 'N/A'}
 Overview: ${data.overview || 'N/A'}
 Objectives: ${data.objectives || 'N/A'}
+Target Audience: ${data.audience || 'N/A'}`;
 
-Generate a concise list of 5-7 shot ideas inspired by the visual style in these images.
+  if (data.brandGuidelines) {
+    prompt += `\nBrand Guidelines: ${data.brandGuidelines}`;
+  }
 
-Return as JSON array with objects containing:
-- description (string)
-- shotType (one of: "Wide", "Medium", "Close-up", "Detail", "Overhead")
-- angle (one of: "Eye-level", "High Angle", "Low Angle")
-- notes (string explaining how it relates to the references)
-- category (string)
-- estimatedTime (number in minutes)`;
+  if (data.styleReferences) {
+    prompt += `\nAdditional Style Notes: ${data.styleReferences}`;
+  }
+
+  // Check for existing shots
+  if (data.shotList && data.shotList.length > 0) {
+    const existingDescriptions = data.shotList.map(s => s.description).join('; ');
+    prompt += `\n\nExisting shots (create complementary ones): ${existingDescriptions}`;
+  }
+
+  prompt += `\n\nGenerate 5-7 shot ideas that:
+- Match the visual style and technical approach of the references
+- Fulfill the project objectives
+- Provide variety in coverage (wide, medium, close-up, details)
+- Are feasible to execute
+
+For each shot, provide:
+- description: Clear, actionable shot description
+- shotType: One of "Wide", "Medium", "Close-up", "Detail", "Overhead"
+- angle: One of "Eye-level", "High Angle", "Low Angle", "Dutch Angle"
+- notes: How this relates to the reference images (lighting, composition, mood)
+- category: Shot category
+- estimatedTime: Minutes to capture
+- priority: Boolean - critical shot?
+
+Return as JSON array.`;
 
   const schema = {
     type: 'ARRAY',
@@ -188,6 +268,7 @@ Return as JSON array with objects containing:
         notes: { type: 'STRING' },
         category: { type: 'STRING' },
         estimatedTime: { type: 'NUMBER' },
+        priority: { type: 'BOOLEAN' },
       },
       required: ['description', 'shotType', 'angle', 'notes'],
     },

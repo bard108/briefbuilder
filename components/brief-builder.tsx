@@ -12,6 +12,7 @@ import { ProgressIndicator } from './ui/progress-indicator';
 import { exportAsJSON, exportAsMarkdown, exportShotListAsCSV } from '@/lib/utils/export-utils';
 import { exportBudgetAsCSV } from '@/lib/utils/export-utils';
 import { downloadICalendar, generateGoogleCalendarUrl } from '@/lib/utils/calendar-export';
+import { callGeminiAPI, analyzeBrief, checkBudgetReasonableness, generateProjectIdeas, generateShotList as generateShotListAI, generateShotsFromImages } from '@/lib/utils/ai-helpers';
 
 import { ClientInfoStep } from './client-info-step';
 
@@ -277,31 +278,6 @@ const UserIcon = () => (
 );
 
 // --- API HELPER ---
-async function callGeminiAPI(prompt: string, jsonSchema: Record<string, unknown> | null = null, images?: string[]) {
-    try {
-        const resp = await fetch('/api/gemini', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt, jsonSchema, images: images || [] }),
-        });
-
-        if (!resp.ok) {
-            const errText = await resp.text();
-            console.error('Gemini proxy error:', errText);
-            return null;
-        }
-
-        const json = await resp.json();
-        // server returns { text } where text is the raw response body from the Gemini API
-        if (json && typeof json.text === 'string') return json.text;
-        return null;
-    } catch (err) {
-        console.error('callGeminiAPI error:', err);
-        return null;
-    }
-}
-
-
 // --- FORM HELPER COMPONENTS ---
 const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose: () => void, title: string, children: React.ReactNode }) => {
     if (!isOpen) return null;
@@ -401,35 +377,21 @@ const ProjectDetailsStep = ({ data, updateData }: StepProps) => {
             return;
         }
         setIsLoading(true);
-        const prompt = `Based on the project name "${data.projectName}", generate a concise, one-paragraph project overview and a short, bulleted list of 3-4 key objectives for a photography brief. Return either JSON {overview: string, objectives: string[]} or plain text titled Overview: and Objectives:.`;
-        const result = await callGeminiAPI(prompt);
+        
+        // Use the helper function with enhanced context
+        const result = await generateProjectIdeas(data.projectName, {
+            projectType: data.projectType,
+            budget: data.budget,
+            audience: data.audience,
+            brandGuidelines: data.brandGuidelines,
+            styleReferences: data.styleReferences,
+        });
+        
         if (result) {
-            try {
-                let text = result;
-                const codeMatch = text.match(/```[a-zA-Z]*\n([\s\S]*?)```/);
-                if (codeMatch) text = codeMatch[1].trim();
-
-                if (text.trim().startsWith('{') || text.trim().startsWith('[')) {
-                    const obj = JSON.parse(text);
-                    if (obj.overview) updateData('overview', String(obj.overview).trim());
-                    if (obj.objectives) {
-                        const arr = Array.isArray(obj.objectives) ? obj.objectives : String(obj.objectives).split(/\n|\r/);
-                        const cleaned = arr.map((l: string) => l.replace(/^[-*\s]+/, '').trim()).filter(Boolean).join('\n• ');
-                        updateData('objectives', '• ' + cleaned);
-                    }
-                } else {
-                    const cleaned = text.replace(/\*\*/g, '').replace(/^#+\s*/gm, '');
-                    const oMatch = cleaned.match(/Overview:([\s\S]*?)(Objectives?:|$)/i);
-                    const objMatch = cleaned.match(/Objectives?:([\s\S]*)/i);
-                    if (oMatch && oMatch[1]) updateData('overview', oMatch[1].trim());
-                    if (objMatch && objMatch[1]) {
-                        const lines = objMatch[1].split(/\r?\n/).map((l: string) => l.replace(/^[-*\s]+/, '').trim()).filter(Boolean);
-                        if (lines.length) updateData('objectives', '• ' + lines.join('\n• '));
-                    }
-                }
-            } catch (e) {
-                console.warn('Failed to parse AI output, storing raw text.');
-                updateData('overview', result.substring(0, 600));
+            if (result.overview) updateData('overview', result.overview);
+            if (result.objectives && Array.isArray(result.objectives)) {
+                const formatted = '• ' + result.objectives.join('\n• ');
+                updateData('objectives', formatted);
             }
         }
         setIsLoading(false);
@@ -635,32 +597,13 @@ const MoodboardStep = ({ data, updateData }: StepProps) => {
         }
         const maxUse = files.slice(0, 6); // limit to keep payload small
         const dataUrls = await Promise.all(maxUse.map(fileToDataUrl));
-        const prompt = `You are an expert photo art director. Based on the uploaded reference images and this brief context:\n` +
-            `Project: ${data.projectName || 'Untitled'}\nOverview: ${data.overview || 'N/A'}\nObjectives: ${data.objectives || 'N/A'}\n` +
-            `Generate a concise list of 5-7 shot ideas as JSON array with fields: description, shotType (Wide|Medium|Close-up|Detail|Overhead), angle (Eye-level|High Angle|Low Angle), notes.`;
-        const shotListSchema = {
-            type: 'ARRAY',
-            items: {
-                type: 'OBJECT',
-                properties: {
-                    description: { type: 'STRING' },
-                    shotType: { type: 'STRING' },
-                    angle: { type: 'STRING' },
-                    notes: { type: 'STRING' },
-                },
-                required: ['description', 'shotType', 'angle', 'notes']
-            }
-        };
-        const result = await callGeminiAPI(prompt, shotListSchema, dataUrls);
-        if (result) {
-            try {
-                const newShotsData = JSON.parse(result) as Omit<Shot, 'id' | 'priority'>[];
-                const newShots = newShotsData.map((shot) => ({ ...shot, id: Date.now() + Math.random(), priority: false }));
-                updateData('shotList', [...(data.shotList || []), ...newShots]);
-            } catch (e) {
-                console.error('Failed to parse vision shot list JSON:', e);
-                alert('AI returned an invalid response. Please try again.');
-            }
+        
+        // Use the enhanced helper function
+        const newShots = await generateShotsFromImages(data as any, dataUrls);
+        if (newShots) {
+            updateData('shotList', [...(data.shotList || []), ...newShots]);
+        } else {
+            alert('AI returned an invalid response. Please try again.');
         }
     };
 
@@ -827,18 +770,11 @@ const ShotListStep = ({ data, updateData }: StepProps) => {
 
     const generateShotList = async () => {
         setIsLoading(true);
-        const prompt = `You are a helpful assistant for photographers and producers. Based on the following photography project brief, generate a detailed shot list of 5-7 ideas. \n        Project Name: "${data.projectName || 'Not specified'}"\n        Project Type: "${data.projectType || 'Not specified'}"\n        Project Overview: "${data.overview || 'Not specified'}"\n        Key Objectives: "${data.objectives || 'Not specified'}"\n\n        Return the shot list as a JSON array of objects. Each object should have keys: "description" (string), "shotType" (one of "Wide", "Medium", "Close-up", "Detail", "Overhead"), "angle" (one of "Eye-level", "High Angle", "Low Angle"), and "notes" (string, can be empty).`;
-        const shotListSchema = { type: "ARRAY", items: { type: "OBJECT", properties: { description: { type: "STRING" }, shotType: { type: "STRING" }, angle: { type: "STRING" }, notes: { type: "STRING" }, }, required: ["description", "shotType", "angle", "notes"] } };
-        const result = await callGeminiAPI(prompt, shotListSchema);
-        if (result) {
-            try {
-                const newShotsData = JSON.parse(result) as Omit<Shot, 'id' | 'priority'>[];
-                const newShots = newShotsData.map((shot) => ({ ...shot, id: Date.now() + Math.random(), priority: false }));
-                updateData('shotList', [...shotList, ...newShots]);
-            } catch (e) {
-                console.error("Failed to parse shot list JSON:", e);
-                alert("The AI generated an invalid response. Please try again.");
-            }
+        const newShots = await generateShotListAI(data as any);
+        if (newShots) {
+            updateData('shotList', [...shotList, ...newShots]);
+        } else {
+            alert("Failed to generate shot list. Please try again.");
         }
         setIsLoading(false);
     };
@@ -1045,6 +981,9 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
     const [includeSelf, setIncludeSelf] = useState<boolean>(!!data.clientEmail);
     const [additionalRecipients, setAdditionalRecipients] = useState('');
     const [isSending, setIsSending] = useState(false);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [isAnalysisModalOpen, setAnalysisModalOpen] = useState(false);
+    const [analysisResults, setAnalysisResults] = useState<{ brief?: string; budget?: string }>({});
     const briefContentRef = useRef<HTMLDivElement | null>(null);
     const shareLinkRef = useRef<HTMLInputElement | null>(null);
 
@@ -1209,6 +1148,33 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
         const el = shareLinkRef.current; if (!el) return; el.select(); document.execCommand('copy');
     };
 
+    const handleAnalyzeBrief = async () => {
+        setIsAnalyzing(true);
+        setAnalysisModalOpen(true);
+        setAnalysisResults({});
+        
+        try {
+            // Run both analyses in parallel
+            const [briefAnalysis, budgetAnalysis] = await Promise.all([
+                analyzeBrief(data as any),
+                data.budget ? checkBudgetReasonableness(data as any) : Promise.resolve(null)
+            ]);
+            
+            setAnalysisResults({
+                brief: briefAnalysis || 'Analysis not available.',
+                budget: budgetAnalysis || undefined
+            });
+        } catch (error) {
+            console.error('Error analyzing brief:', error);
+            setAnalysisResults({
+                brief: 'Failed to analyze brief. Please try again.',
+                budget: undefined
+            });
+        } finally {
+            setIsAnalyzing(false);
+        }
+    };
+
     const handleSendEmail = () => {
         const rawSelf = includeSelf && data.clientEmail ? [data.clientEmail] : [];
         const others = additionalRecipients.split(',').map(s => s.trim()).filter(Boolean);
@@ -1328,6 +1294,9 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
             </div>
 
             <div className="flex flex-col md:flex-row md:justify-between md:items-center mt-6 gap-4">
+                <button onClick={handleAnalyzeBrief} disabled={isAnalyzing} className="w-full md:w-auto px-4 py-2 bg-purple-600 text-white font-semibold rounded-md hover:bg-purple-700 disabled:bg-gray-400 transition-colors shadow-sm">
+                    {isAnalyzing ? '🤖 Analyzing...' : '🤖 AI Review Brief'}
+                </button>
                 <button onClick={handleShare} className="w-full md:w-auto px-4 py-2 bg-gray-100 text-gray-800 font-semibold rounded-md hover:bg-gray-200 transition-colors">Share Link</button>
                 <button onClick={handleDownloadPdf} className="w-full md:w-auto px-4 py-2 bg-gray-100 text-gray-800 font-semibold rounded-md hover:bg-gray-200 transition-colors">Download PDF</button>
                 <button onClick={() => setEmailModalOpen(true)} className="w-full md:w-auto px-4 py-2 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 transition-colors shadow-sm">Email Brief</button>
@@ -1373,6 +1342,53 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
                     </div>
                     <div className="flex justify-end">
                         <button onClick={() => setShareModalOpen(false)} className="px-4 py-2 bg-gray-200 text-gray-700 font-semibold rounded-md hover:bg-gray-300 transition-colors">Close</button>
+                    </div>
+                </div>
+            </Modal>
+
+            <Modal isOpen={isAnalysisModalOpen} onClose={() => setAnalysisModalOpen(false)} title="🤖 AI Brief Analysis">
+                <div className="space-y-6 max-h-96 overflow-y-auto">
+                    {isAnalyzing ? (
+                        <div className="flex flex-col items-center justify-center py-8">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mb-4"></div>
+                            <p className="text-gray-600">Analyzing your brief...</p>
+                        </div>
+                    ) : (
+                        <>
+                            {analysisResults.brief && (
+                                <div className="space-y-3">
+                                    <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                                        <span className="mr-2">📋</span>
+                                        Brief Analysis
+                                    </h3>
+                                    <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+                                        <div className="text-sm text-gray-800 whitespace-pre-wrap">{analysisResults.brief}</div>
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {analysisResults.budget && (
+                                <div className="space-y-3">
+                                    <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                                        <span className="mr-2">💰</span>
+                                        Budget Assessment
+                                    </h3>
+                                    <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                                        <div className="text-sm text-gray-800 whitespace-pre-wrap">{analysisResults.budget}</div>
+                                    </div>
+                                </div>
+                            )}
+                        </>
+                    )}
+                    
+                    <div className="flex justify-end pt-4 border-t">
+                        <button 
+                            onClick={() => setAnalysisModalOpen(false)} 
+                            disabled={isAnalyzing}
+                            className="px-4 py-2 bg-gray-200 text-gray-700 font-semibold rounded-md hover:bg-gray-300 disabled:bg-gray-100 disabled:text-gray-400 transition-colors"
+                        >
+                            Close
+                        </button>
                     </div>
                 </div>
             </Modal>
