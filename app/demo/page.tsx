@@ -249,7 +249,6 @@ export default function DemoPage() {
                             shotType: 'Medium' as const,
                             angle: 'Eye-level' as const,
                             orientation: 'Any' as const,
-                            quantity: 1,
                             priority: false,
                             notes: '',
                             order: (formData.shotList?.length || 0) + 1,

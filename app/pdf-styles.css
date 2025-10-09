@@ -1,0 +1,62 @@
+/* Professional PDF Styles */
+:root {
+  color-scheme: light;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.pdf-document {
+  --pdf-primary: rgb(59, 130, 246);      /* Bright blue for accents */
+  --pdf-text-dark: rgb(17, 24, 39);      /* Near black for main text */
+  --pdf-text-medium: rgb(55, 65, 81);    /* Dark gray for headings */
+  --pdf-text-light: rgb(107, 114, 128);  /* Medium gray for subtitles */
+  --pdf-border: rgb(229, 231, 235);      /* Light gray for borders */
+  --pdf-bg-white: rgb(255, 255, 255);    /* Pure white */
+  --pdf-bg-gray: rgb(249, 250, 251);     /* Very light gray */
+  
+  /* Background colors */
+  --bg-white: rgb(255, 255, 255);
+  --bg-gray-50: rgb(249, 250, 251);
+  --bg-gray-100: rgb(243, 244, 246);
+  --bg-gray-200: rgb(229, 231, 235);
+  
+  /* Border colors */
+  --border-gray-200: rgb(229, 231, 235);
+  --border-gray-300: rgb(209, 213, 219);
+  
+  /* Brand colors */
+  --indigo-600: rgb(79, 70, 229);
+  
+  /* Force light mode colors */
+  background-color: var(--bg-white);
+  color: var(--text-gray-900);
+}
+
+/* Basic text colors */
+.pdf-content [class*="text-gray-"] {
+  color: var(--text-gray-700);
+}
+
+.pdf-content .text-gray-900 { color: var(--text-gray-900); }
+.pdf-content .text-gray-800 { color: var(--text-gray-800); }
+.pdf-content .text-gray-700 { color: var(--text-gray-700); }
+.pdf-content .text-gray-600 { color: var(--text-gray-600); }
+.pdf-content .text-gray-500 { color: var(--text-gray-500); }
+.pdf-content .text-gray-400 { color: var(--text-gray-400); }
+
+/* Background colors */
+.pdf-content .bg-white { background-color: var(--bg-white); }
+.pdf-content .bg-gray-50 { background-color: var(--bg-gray-50); }
+.pdf-content .bg-gray-100 { background-color: var(--bg-gray-100); }
+.pdf-content .bg-gray-200 { background-color: var(--bg-gray-200); }
+
+/* Border colors */
+.pdf-content .border-gray-200 { border-color: var(--border-gray-200); }
+.pdf-content .border-gray-300 { border-color: var(--border-gray-300); }
+
+/* Force all color properties to use RGB */
+.pdf-content * {
+  color-scheme: light;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
