@@ -5,6 +5,39 @@ export const pdfStyles = `
     print-color-adjust: exact;
   }
 
+  /* Force light mode for PDF generation */
+  .dark #brief-content-for-pdf,
+  #brief-content-for-pdf {
+    /* Override any dark mode colors with light mode equivalents */
+    --tw-text-opacity: 1 !important;
+    --tw-bg-opacity: 1 !important;
+    color: rgb(17, 24, 39) !important;
+    background-color: rgb(255, 255, 255) !important;
+  }
+  
+  /* Explicit RGB colors for html2canvas */
+  #brief-content-for-pdf *,
+  #brief-content-for-pdf {
+    --tw-text-opacity: 1 !important;
+    --tw-bg-opacity: 1 !important;
+    --tw-border-opacity: 1 !important;
+    border-color: rgb(229, 231, 235) !important;
+  }
+
+  #brief-content-for-pdf [class*="text-gray"],
+  #brief-content-for-pdf [class*="text-slate"] {
+    color: rgb(17, 24, 39) !important;
+  }
+
+  #brief-content-for-pdf [class*="bg-white"] {
+    background-color: rgb(255, 255, 255) !important;
+  }
+
+  #brief-content-for-pdf [class*="bg-gray"],
+  #brief-content-for-pdf [class*="bg-slate"] {
+    background-color: rgb(249, 250, 251) !important;
+  }
+
   #brief-content-for-pdf {
     --pdf-primary: rgb(59, 130, 246);
     --pdf-text-dark: rgb(17, 24, 39);

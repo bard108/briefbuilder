@@ -993,8 +993,10 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
     const handleDownloadPdf = async () => {
         if (!briefContentRef.current) return;
         try {
+            // Convert OKLCH values if present
+            const brandColor = '#4f46e5';  // Indigo-600 in hex format
             await generateEnhancedPDF(data as any, briefContentRef.current, {
-                brandColor: '#4f46e5',
+                brandColor: brandColor.startsWith('oklch') ? oklchStringToHex(brandColor) || '#4f46e5' : brandColor,
             });
         } catch (error) {
             console.error('Error generating PDF:', error);
@@ -1364,32 +1366,11 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
 export default function BriefBuilder() {
     const { role, currentStep, briefData, setRole, setCurrentStep, updateBriefData, getCompletionPercentage, getMissingRequiredFields, isDirty, lastSaved, markSaved, resetBrief } = useBriefStore();
     const [formData, setFormData] = useState<FormData>({});
-    const [darkMode, setDarkMode] = useState(false);
     const [showResetConfirm, setShowResetConfirm] = useState(false);
 
     // enable auto-save and before-unload warning
     useAutoSave(30000);
     useBeforeUnload();
-
-    useEffect(() => {
-        // initialize theme
-        const stored = typeof window !== 'undefined' ? localStorage.getItem('theme') : null;
-        const isDark = stored ? stored === 'dark' : false;
-        setDarkMode(isDark);
-        if (isDark) document.documentElement.classList.add('dark');
-    }, []);
-
-    const toggleDark = () => {
-        const next = !darkMode;
-        setDarkMode(next);
-        if (next) {
-            document.documentElement.classList.add('dark');
-            localStorage.setItem('theme', 'dark');
-        } else {
-            document.documentElement.classList.remove('dark');
-            localStorage.setItem('theme', 'light');
-        }
-    };
 
     const handleResetBrief = () => {
         setShowResetConfirm(true);
@@ -1557,33 +1538,30 @@ export default function BriefBuilder() {
         <div className="bg-gray-100 min-h-screen font-sans p-4 sm:p-6 lg:p-8">
             <div className="max-w-6xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden md:flex">
                 {/* Sidebar / Progress Bar */}
-                <div className="md:w-1/3 bg-gray-50 p-8 border-r border-gray-200 dark:bg-slate-900 dark:border-slate-800">
+                <div className="md:w-1/3 bg-gray-50 p-8 border-r border-gray-200">
                     <div className="flex items-center justify-between mb-2">
-                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                        <h1 className="text-2xl font-bold text-gray-900">
                             {formData.userRole === 'Client' ? 'Project Inquiry' : 'Photography Brief'}
                         </h1>
                         <button 
                             onClick={handleResetBrief} 
-                            className="px-2 py-1 text-xs rounded border border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20 transition-colors"
+                            className="px-2 py-1 text-xs rounded border border-red-300 text-red-600 hover:bg-red-50 transition-colors"
                             title="Start a new brief"
                         >
                             🗑️ New Brief
                         </button>
                     </div>
                     <div className="flex items-center justify-between mb-3">
-                        <p className="text-gray-600 dark:text-slate-300">Created by <span className="font-semibold">{formData.clientName || formData.userRole}</span></p>
-                        <button onClick={toggleDark} className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-slate-700 dark:text-slate-200">
-                            {darkMode ? '🌙 Dark' : '☀️ Light'}
-                        </button>
+                        <p className="text-gray-600">Created by <span className="font-semibold">{formData.clientName || formData.userRole}</span></p>
                     </div>
                     <div className="mb-3 text-xs">
                         {isDirty ? (
-                            <div className="inline-flex items-center gap-2 px-2 py-1 rounded bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                            <div className="inline-flex items-center gap-2 px-2 py-1 rounded bg-yellow-100 text-yellow-800">
                                 <span className="h-2 w-2 rounded-full bg-yellow-500 animate-pulse"></span>
                                 Unsaved changes
                             </div>
                         ) : lastSaved ? (
-                            <div className="inline-flex items-center gap-2 px-2 py-1 rounded bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                            <div className="inline-flex items-center gap-2 px-2 py-1 rounded bg-green-100 text-green-800">
                                 <span className="h-2 w-2 rounded-full bg-green-500"></span>
                                 Saved {new Date(lastSaved).toLocaleTimeString()}
                             </div>
@@ -1609,14 +1587,14 @@ export default function BriefBuilder() {
                 </div>
 
                 {/* Main Content */}
-                <div className="md:w-2/3 p-8 md:p-12 overflow-y-auto dark:bg-slate-950 dark:text-slate-100" style={{maxHeight: '90vh'}}>
+                <div className="md:w-2/3 p-8 md:p-12 overflow-y-auto bg-white" style={{maxHeight: '90vh'}}>
                     <div className="animate-fade-in">
                         {steps.length > 0 ? renderStep() : (
                           <div className="space-y-4">
-                            <div className="h-6 w-48 bg-gray-200 rounded animate-pulse dark:bg-slate-800" />
-                            <div className="h-4 w-full bg-gray-200 rounded animate-pulse dark:bg-slate-800" />
-                            <div className="h-4 w-5/6 bg-gray-200 rounded animate-pulse dark:bg-slate-800" />
-                            <div className="h-4 w-2/3 bg-gray-200 rounded animate-pulse dark:bg-slate-800" />
+                            <div className="h-6 w-48 bg-gray-200 rounded animate-pulse" />
+                            <div className="h-4 w-full bg-gray-200 rounded animate-pulse" />
+                            <div className="h-4 w-5/6 bg-gray-200 rounded animate-pulse" />
+                            <div className="h-4 w-2/3 bg-gray-200 rounded animate-pulse" />
                           </div>
                         )}
                     </div>
@@ -1654,20 +1632,20 @@ export default function BriefBuilder() {
             {/* Reset Confirmation Modal */}
             {showResetConfirm && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4" onClick={() => setShowResetConfirm(false)}>
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+                    <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center mb-4">
-                            <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mr-4">
+                            <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mr-4">
                                 <span className="text-2xl">⚠️</span>
                             </div>
-                            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Start a New Brief?</h2>
+                            <h2 className="text-xl font-bold text-gray-900">Start a New Brief?</h2>
                         </div>
-                        <p className="text-gray-600 dark:text-gray-300 mb-6">
+                        <p className="text-gray-600 mb-6">
                             This will clear all current data and start fresh. Make sure you've saved or exported your current brief if needed.
                         </p>
                         <div className="flex justify-end gap-3">
                             <button 
                                 onClick={() => setShowResetConfirm(false)} 
-                                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                                className="px-4 py-2 bg-gray-200 text-gray-700 font-semibold rounded-md hover:bg-gray-300 transition-colors"
                             >
                                 Cancel
                             </button>

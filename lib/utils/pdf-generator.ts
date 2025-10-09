@@ -33,6 +33,41 @@ export async function generateEnhancedPDF(
     
     // Clone and append the content
     const contentClone = contentElement.cloneNode(true) as HTMLElement;
+    
+    // Process the element tree to handle dark mode and color formats
+    const processElement = (element: Element) => {
+      // Remove dark mode classes
+      const classes = element.classList;
+      for (let i = classes.length - 1; i >= 0; i--) {
+        const cls = classes[i];
+        if (cls.startsWith('dark:')) {
+          classes.remove(cls);
+        }
+      }
+      
+      // Convert OKLCH colors in computed styles to RGB
+      if (element instanceof HTMLElement) {
+        const style = window.getComputedStyle(element);
+        const properties = ['color', 'background-color', 'border-color', 'text-decoration-color'];
+        
+        properties.forEach(prop => {
+          const value = style.getPropertyValue(prop);
+          if (value && value.includes('oklch')) {
+            // Force light mode colors
+            if (prop === 'color') {
+              element.style.setProperty(prop, 'rgb(17, 24, 39)'); // text-gray-900
+            } else if (prop === 'background-color') {
+              element.style.setProperty(prop, 'rgb(255, 255, 255)'); // white
+            }
+          }
+        });
+      }
+      
+      // Recursively process child elements
+      element.querySelectorAll('*').forEach(processElement);
+    };
+    
+    processElement(contentClone);
     wrapper.appendChild(contentClone);
     document.body.appendChild(wrapper);
 
@@ -62,13 +97,19 @@ export async function generateEnhancedPDF(
 
     // Add header and footer to each page
     const addHeaderFooter = (page: number) => {
+      // Convert hex color to RGB components
+      const hexColor = options.brandColor || '#4f46e5';
+      const r = parseInt(hexColor.slice(1, 3), 16);
+      const g = parseInt(hexColor.slice(3, 5), 16);
+      const b = parseInt(hexColor.slice(5, 7), 16);
+
       // Header
-      doc.setDrawColor(79, 70, 229);
+      doc.setDrawColor(r, g, b);
       doc.setLineWidth(0.5);
       doc.line(margin, 12, width - margin, 12);
       
       doc.setFontSize(9);
-      doc.setTextColor(79, 70, 229);
+      doc.setTextColor(r, g, b);
       doc.text(data.projectName || 'Photography Brief', margin, 10);
       
       // Footer
