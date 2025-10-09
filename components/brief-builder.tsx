@@ -992,6 +992,17 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
 
     const handleDownloadPdf = async () => {
         try {
+            if (!briefContentRef.current) {
+                throw new Error('Content element not found. Please ensure all content is loaded.');
+            }
+            
+            // Give time for any dynamic content to render
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Ensure the element is visible
+            briefContentRef.current.style.display = 'block';
+            briefContentRef.current.style.visibility = 'visible';
+            
             await generateEnhancedPDF(data as any, briefContentRef.current, {
                 includeCoverPage: true,
                 includeWatermark: false,
@@ -999,7 +1010,8 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
             });
         } catch (err) {
             console.error('Error generating PDF:', err);
-            alert('Failed to generate PDF. See console for details.');
+            const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+            alert(`Failed to generate PDF: ${errorMessage}`);
         }
     };
 
