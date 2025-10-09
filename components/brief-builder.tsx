@@ -1003,25 +1003,60 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
             // Give time for any dynamic content to render
             await new Promise(resolve => setTimeout(resolve, 500));
             
+            // Create a wrapper div with light mode forced
+            const wrapper = document.createElement('div');
+            wrapper.style.position = 'absolute';
+            wrapper.style.left = '-9999px';
+            wrapper.style.backgroundColor = 'white';
+            // Force light mode by removing dark mode classes and color schemes
+            wrapper.classList.add('light');
+            wrapper.style.colorScheme = 'light';
+            wrapper.setAttribute('data-force-color-scheme', 'light');
+            
             // Create a clone of the content for PDF generation
             console.log('Creating content clone...');
             const pdfContent = briefContentRef.current.cloneNode(true) as HTMLElement;
-            document.body.appendChild(pdfContent);
-            pdfContent.style.position = 'absolute';
-            pdfContent.style.left = '-9999px';
+            wrapper.appendChild(pdfContent);
+            document.body.appendChild(wrapper);
             
             try {
-                // Convert all colors to RGB format
-                console.log('Converting all colors to RGB format...');
-                const convertToRGB = (element: Element) => {
+                // Remove dark mode classes and convert colors
+                console.log('Processing elements for PDF...');
+                const processElement = (element: Element) => {
                     const el = element as HTMLElement;
+                    
+                    // Remove dark mode classes
+                    const classes = Array.from(el.classList);
+                    classes.forEach(cls => {
+                        if (cls.startsWith('dark:')) {
+                            el.classList.remove(cls);
+                        }
+                    });
+
+                    // Force light mode on element
+                    el.classList.remove('dark');
+                    el.classList.add('light');
+                    
+                    // Get computed styles in light mode
                     const computed = window.getComputedStyle(el);
                     
-                    // Helper to safely get RGB color
-                    const getRGBColor = (color: string) => {
-                        // Create a temporary element to compute the color
+                    // Convert CSS variables and color values to RGB
+                    const convertToRGB = (value: string) => {
+                        if (!value || value === 'none' || value === 'transparent' || value === 'rgba(0, 0, 0, 0)') {
+                            return value;
+                        }
+                        
+                        // Handle CSS variables
+                        if (value.startsWith('var(')) {
+                            const varName = value.match(/var\((.*?)\)/)?.[1];
+                            if (varName) {
+                                value = computed.getPropertyValue(varName).trim();
+                            }
+                        }
+                        
+                        // Create temp element to compute final RGB value
                         const temp = document.createElement('div');
-                        temp.style.color = color;
+                        temp.style.color = value;
                         temp.style.display = 'none';
                         document.body.appendChild(temp);
                         const rgb = window.getComputedStyle(temp).color;
@@ -1029,24 +1064,27 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
                         return rgb;
                     };
 
-                    // Convert all color properties
-                    const colorProps = ['color', 'backgroundColor', 'borderColor'];
-                    colorProps.forEach(prop => {
-                        const value = computed[prop as any];
-                        if (value && value !== 'rgba(0, 0, 0, 0)') {
-                            try {
-                                el.style[prop as any] = getRGBColor(value);
-                            } catch (e) {
-                                console.warn(`Failed to convert ${prop}:`, e);
+                    // Apply computed RGB values to inline styles
+                    try {
+                        const stylesToConvert = ['color', 'backgroundColor', 'borderColor'];
+                        stylesToConvert.forEach(prop => {
+                            const value = computed[prop as any];
+                            if (value) {
+                                const rgbValue = convertToRGB(value);
+                                if (rgbValue) {
+                                    el.style[prop as any] = rgbValue;
+                                }
                             }
-                        }
-                    });
+                        });
+                    } catch (e) {
+                        console.warn('Style conversion warning:', e);
+                    }
                 };
 
-                // Convert colors for all elements
+                // Process all elements
                 const allElements = pdfContent.getElementsByTagName('*');
-                Array.from(allElements).forEach(convertToRGB);
-                convertToRGB(pdfContent); // Don't forget the container itself
+                Array.from(allElements).forEach(processElement);
+                processElement(pdfContent);
                 
                 // Ensure all images are loaded
                 console.log('Waiting for images to load...');
@@ -1077,8 +1115,10 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
                 
                 console.log('PDF generation complete');
             } finally {
-                // Clean up the cloned element
-                document.body.removeChild(pdfContent);
+                // Clean up the wrapper and cloned element
+                if (pdfContent.parentElement) {
+                    document.body.removeChild(pdfContent.parentElement);
+                }
             }
         } catch (err) {
             console.error('Error generating PDF:', err);
