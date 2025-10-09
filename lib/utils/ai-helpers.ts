@@ -163,9 +163,9 @@ Target Audience: "${data.audience || 'Not specified'}"`;
 - description: Clear, specific shot description
 - shotType: One of "Wide", "Medium", "Close-up", "Detail", "Overhead"
 - angle: One of "Eye-level", "High Angle", "Low Angle", "Dutch Angle"
+- orientation: One of "Portrait", "Landscape", "Square", "Any"
 - notes: Technical notes, lighting suggestions, or creative direction
 - category: Shot category (e.g., "Hero", "Details", "Lifestyle", "Product", "Atmosphere")
-- estimatedTime: Estimated minutes to capture
 - priority: Boolean - is this a must-have shot based on objectives?
 
 Return as JSON array.`;
@@ -178,9 +178,9 @@ Return as JSON array.`;
         description: { type: 'STRING' },
         shotType: { type: 'STRING' },
         angle: { type: 'STRING' },
+        orientation: { type: 'STRING' },
         notes: { type: 'STRING' },
         category: { type: 'STRING' },
-        estimatedTime: { type: 'NUMBER' },
         priority: { type: 'BOOLEAN' },
       },
       required: ['description', 'shotType', 'angle', 'notes'],
@@ -195,7 +195,7 @@ Return as JSON array.`;
         ...shot,
         id: Date.now() + index,
         priority: shot.priority || false,
-        status: 'Not Started',
+        orientation: shot.orientation || 'Any',
         order: (data.shotList?.length || 0) + index + 1,
         equipment: [],
       }));
@@ -250,9 +250,9 @@ For each shot, provide:
 - description: Clear, actionable shot description
 - shotType: One of "Wide", "Medium", "Close-up", "Detail", "Overhead"
 - angle: One of "Eye-level", "High Angle", "Low Angle", "Dutch Angle"
+- orientation: One of "Portrait", "Landscape", "Square", "Any"
 - notes: How this relates to the reference images (lighting, composition, mood)
 - category: Shot category
-- estimatedTime: Minutes to capture
 - priority: Boolean - critical shot?
 
 Return as JSON array.`;
@@ -265,9 +265,9 @@ Return as JSON array.`;
         description: { type: 'STRING' },
         shotType: { type: 'STRING' },
         angle: { type: 'STRING' },
+        orientation: { type: 'STRING' },
         notes: { type: 'STRING' },
         category: { type: 'STRING' },
-        estimatedTime: { type: 'NUMBER' },
         priority: { type: 'BOOLEAN' },
       },
       required: ['description', 'shotType', 'angle', 'notes'],
@@ -282,7 +282,7 @@ Return as JSON array.`;
         ...shot,
         id: Date.now() + index,
         priority: false,
-        status: 'Not Started',
+        orientation: shot.orientation || 'Any',
         order: index + 1,
         equipment: [],
       }));
@@ -297,7 +297,7 @@ Return as JSON array.`;
 // Generate schedule from crew and shot list
 export async function generateSchedule(data: FormData): Promise<string | null> {
   const shotListSummary = (data.shotList || [])
-    .map((s: Shot) => `- ${s.description} (${s.shotType}, ${s.estimatedTime || 30}min)`)
+    .map((s: Shot) => `- ${s.description} (${s.shotType})`)
     .join('\n');
   const crewListSummary = (data.crew || [])
     .map((c) => `- ${c.name} (${c.role}, call: ${c.callTime || 'TBD'})`)

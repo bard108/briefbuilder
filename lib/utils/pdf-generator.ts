@@ -226,13 +226,13 @@ export async function exportShotListPDF(data: FormData): Promise<void> {
         y += notesLines.length * 4;
       }
 
-      if (shot.equipment && shot.equipment.length > 0) {
-        pdf.text(`Equipment: ${shot.equipment.join(', ')}`, margin, y);
+      if (shot.orientation) {
+        pdf.text(`Orientation: ${shot.orientation}`, margin, y);
         y += 5;
       }
 
-      if (shot.estimatedTime) {
-        pdf.text(`Est. Time: ${shot.estimatedTime} min`, margin, y);
+      if (shot.equipment && shot.equipment.length > 0) {
+        pdf.text(`Equipment: ${shot.equipment.join(', ')}`, margin, y);
         y += 5;
       }
 

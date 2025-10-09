@@ -6,13 +6,12 @@ export const shotSchema = z.object({
   description: z.string(),
   shotType: z.enum(['Wide', 'Medium', 'Close-up', 'Detail', 'Overhead', 'Other']),
   angle: z.enum(['Eye-level', 'High Angle', 'Low Angle', 'Dutch Angle', 'Other']),
+  orientation: z.enum(['Portrait', 'Landscape', 'Square', 'Any']).optional(),
   priority: z.boolean(),
   notes: z.string(),
   category: z.string().optional(),
-  estimatedTime: z.number().optional(), // in minutes
   equipment: z.array(z.string()).optional(),
   referenceImage: z.string().optional(), // URL or data URL
-  status: z.enum(['Not Started', 'In Progress', 'Complete', 'Rejected']).optional(),
   order: z.number().optional(),
 });
 
@@ -104,6 +103,8 @@ export const formDataSchema = z.object({
   
   // Shoot Details
   shootDates: z.string().optional(),
+  shootStartTime: z.string().optional(),
+  shootFinishTime: z.string().optional(),
   shootStatus: z.enum(['Confirmed', 'Pencil', 'Proposed', 'TBD']).optional(),
   location: z.string().optional(),
   locationDetails: locationSchema.optional(),

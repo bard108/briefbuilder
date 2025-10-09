@@ -9,8 +9,7 @@ import { StartPage } from './start-page';
 import { SortableShotList } from './ui/sortable-shot-list';
 import { TemplateSelector } from './ui/template-selector';
 import { ProgressIndicator } from './ui/progress-indicator';
-import { exportAsJSON, exportAsMarkdown, exportShotListAsCSV } from '@/lib/utils/export-utils';
-import { exportBudgetAsCSV } from '@/lib/utils/export-utils';
+import { exportShotListAsCSV, exportBudgetAsCSV } from '@/lib/utils/export-utils';
 import { downloadICalendar, generateGoogleCalendarUrl } from '@/lib/utils/calendar-export';
 import { callGeminiAPI, analyzeBrief, checkBudgetReasonableness, generateProjectIdeas, generateShotList as generateShotListAI, generateShotsFromImages } from '@/lib/utils/ai-helpers';
 
@@ -40,6 +39,8 @@ interface FormData {
   clientEmail?: string;
   clientPhone?: string;
   shootDates?: string;
+  shootStartTime?: string;
+  shootFinishTime?: string;
   shootStatus?: string;
   location?: string;
   moodboardLink?: string;
@@ -369,43 +370,9 @@ const renderMainContent = ({ onSelectRole }: { onSelectRole: (role: string) => v
 );
 
 const ProjectDetailsStep = ({ data, updateData }: StepProps) => {
-    const [isLoading, setIsLoading] = useState(false);
-
-    const generateIdeas = async () => {
-        if (!data.projectName) {
-            alert("Please enter a Project Name first to generate ideas.");
-            return;
-        }
-        setIsLoading(true);
-        
-        // Use the helper function with enhanced context
-        const result = await generateProjectIdeas(data.projectName, {
-            projectType: data.projectType,
-            budget: data.budget,
-            audience: data.audience,
-            brandGuidelines: data.brandGuidelines,
-            styleReferences: data.styleReferences,
-        });
-        
-        if (result) {
-            if (result.overview) updateData('overview', result.overview);
-            if (result.objectives && Array.isArray(result.objectives)) {
-                const formatted = '• ' + result.objectives.join('\n• ');
-                updateData('objectives', formatted);
-            }
-        }
-        setIsLoading(false);
-    };
-
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-gray-800">Project Details</h2>
-                <button onClick={generateIdeas} disabled={isLoading} className="flex items-center px-3 py-1.5 border border-indigo-600 text-indigo-600 text-sm font-semibold rounded-md hover:bg-indigo-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-300 transition-colors">
-                    <SparklesIcon className="h-4 w-4 mr-2"/>
-                    {isLoading ? 'Generating...' : '✨ Generate Ideas'}
-                </button>
-            </div>
+            <h2 className="text-2xl font-bold text-gray-800">Project Details</h2>
             <p className="text-gray-600">
                 {data.userRole === 'Client' 
                  ? "Start by telling us about your project. What are the key goals and who is the audience?" 
@@ -476,13 +443,37 @@ const ContactStep = ({ data, updateData }: StepProps) => (
 
 const LocationShootDateStep = ({ data, updateData }: StepProps) => (
      <div className="space-y-6">
-        <h2 className="text-2xl font-bold text-gray-800">Shoot Dates & Location</h2>
-        <p className="text-gray-600">Provide the planned dates and location details for the shoot.</p>
+        <h2 className="text-2xl font-bold text-gray-800">Shoot Dates, Times & Location</h2>
+        <p className="text-gray-600">Provide the planned dates, times, and location details for the shoot.</p>
+        
+        {/* Date and Status */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Input label="Proposed Shoot Date(s)" id="shootDates" type="text" placeholder="e.g., Oct 28-29, 2025" value={data.shootDates || ''} onChange={(e) => updateData('shootDates', e.target.value)} />
-             <Input label="Shoot Status" id="shootStatus" type="text" placeholder="e.g., Confirmed, Pencil" value={data.shootStatus || ''} onChange={(e) => updateData('shootStatus', e.target.value)} />
+            <Input label="Shoot Status" id="shootStatus" type="text" placeholder="e.g., Confirmed, Pencil, Proposed" value={data.shootStatus || ''} onChange={(e) => updateData('shootStatus', e.target.value)} />
         </div>
-        <Textarea label="Location Address & Details" id="location" placeholder="Provide the full address and any important details like parking, access, etc." value={data.location || ''} onChange={(e) => updateData('location', e.target.value)} />
+        
+        {/* Start and Finish Times */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Input 
+                label="Start Time" 
+                id="shootStartTime" 
+                type="time" 
+                placeholder="08:00" 
+                value={data.shootStartTime || ''} 
+                onChange={(e) => updateData('shootStartTime', e.target.value)} 
+            />
+            <Input 
+                label="Finish Time" 
+                id="shootFinishTime" 
+                type="time" 
+                placeholder="17:00" 
+                value={data.shootFinishTime || ''} 
+                onChange={(e) => updateData('shootFinishTime', e.target.value)} 
+            />
+        </div>
+        
+        {/* Location */}
+        <Textarea label="Location Address & Details" id="location" placeholder="Provide the full address and any important details like parking, load-in access, etc." value={data.location || ''} onChange={(e) => updateData('location', e.target.value)} />
         
         {/* Production Logistics */}
         <div className="border-t border-gray-200 pt-6 mt-6">
@@ -780,7 +771,7 @@ const ShotListStep = ({ data, updateData }: StepProps) => {
     };
 
     const addShot = () => {
-        const newShot: Shot = { id: Date.now(), description: '', shotType: 'Medium', angle: 'Eye-level', priority: false, notes: '' };
+        const newShot: Shot = { id: Date.now(), description: '', shotType: 'Medium', angle: 'Eye-level', orientation: 'Any', priority: false, notes: '' };
         updateData('shotList', [...shotList, newShot]);
     };
     const removeShot = (id: number) => updateData('shotList', shotList.filter((shot) => shot.id !== id));
@@ -789,24 +780,7 @@ const ShotListStep = ({ data, updateData }: StepProps) => {
         updateData('shotList', newShotList);
     };
 
-    const estimateFromShots = () => {
-        const basePerShot = 200; // simple heuristic base
-        const priorityUplift = 100; // extra per priority shot
-        const prepOverheadRate = 0.1; // 10% overhead
 
-        const totalShots = shotList.length;
-        const priorityShots = shotList.filter(s => s.priority).length;
-        const base = basePerShot * totalShots;
-        const uplift = priorityUplift * priorityShots;
-        const subtotal = base + uplift;
-        const overhead = parseFloat((subtotal * prepOverheadRate).toFixed(2));
-        const breakdown: Record<string, number> = {};
-        breakdown['Shots (' + totalShots + ' x ' + basePerShot + ')'] = base;
-        if (priorityShots > 0) breakdown['Priority uplift (' + priorityShots + ' x ' + priorityUplift + ')'] = uplift;
-        breakdown['Prep/Overhead (10%)'] = overhead;
-        const total = parseFloat((subtotal + overhead).toFixed(2));
-        updateData('budgetEstimate', { total, breakdown });
-    };
 
     return (
         <div className="space-y-6">
@@ -844,32 +818,6 @@ const ShotListStep = ({ data, updateData }: StepProps) => {
                 />
             </div>
             <button onClick={addShot} className="w-full flex justify-center items-center px-4 py-2 border border-dashed border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">+ Add Shot</button>
-
-            {/* Budget Estimator from Shot List */}
-            <div className="space-y-3 p-4 bg-white border rounded-md">
-                <div className="flex items-center justify-between">
-                    <h3 className="text-md font-semibold text-gray-800">Budget Estimator (from Shot List)</h3>
-                    <div className="flex items-center gap-2">
-                        <label className="text-xs text-gray-600">Currency</label>
-                        <select value={data.currency || 'USD'} onChange={(e) => updateData('currency', e.target.value as any)} className="px-2 py-1 border rounded text-sm">
-                            <option value="USD">USD</option>
-                            <option value="EUR">EUR</option>
-                            <option value="GBP">GBP</option>
-                        </select>
-                    </div>
-                </div>
-                <button onClick={estimateFromShots} className="px-3 py-1.5 border border-indigo-600 text-indigo-600 text-sm font-semibold rounded-md hover:bg-indigo-50">Estimate from Shot List</button>
-                {data.budgetEstimate ? (
-                    <div className="text-sm text-gray-700 space-y-1">
-                        {Object.entries(data.budgetEstimate.breakdown).map(([k,v]) => (
-                            <div key={k} className="flex justify-between"><span>{k}</span><span>{new Intl.NumberFormat(undefined, { style: 'currency', currency: data.currency || 'USD' }).format(v)}</span></div>
-                        ))}
-                        <div className="flex justify-between font-bold pt-2 border-t"><span>Total</span><span>{new Intl.NumberFormat(undefined, { style: 'currency', currency: data.currency || 'USD' }).format(data.budgetEstimate.total)}</span></div>
-                    </div>
-                ) : (
-                    <p className="text-sm text-gray-500">Add shots and click Estimate.</p>
-                )}
-            </div>
 
             {/* Template Selector Modal */}
             {showTemplateSelector && (
@@ -1231,12 +1179,14 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
                     </div>
                 )}
 
-                {(data.shootDates || data.shootStatus || data.location) && (
+                {(data.shootDates || data.shootStartTime || data.shootFinishTime || data.shootStatus || data.location) && (
                     <div>
-                        <h3 className="text-lg font-semibold text-gray-800 mb-2">Dates & Location</h3>
+                        <h3 className="text-lg font-semibold text-gray-800 mb-2">Dates, Times & Location</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-700">
                             {data.shootDates && <div><span className="font-medium">Dates:</span> {data.shootDates}</div>}
                             {data.shootStatus && <div><span className="font-medium">Status:</span> {data.shootStatus}</div>}
+                            {data.shootStartTime && <div><span className="font-medium">Start Time:</span> {data.shootStartTime}</div>}
+                            {data.shootFinishTime && <div><span className="font-medium">Finish Time:</span> {data.shootFinishTime}</div>}
                         </div>
                         {data.location && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Location:</span> {data.location}</p>}
                     </div>
@@ -1304,8 +1254,6 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
 
             {/* Export Buttons */}
             <div className="flex flex-wrap gap-2 mt-2">
-                <button onClick={() => exportAsJSON(data as any)} className="px-3 py-1.5 bg-gray-100 text-gray-800 text-sm rounded-md hover:bg-gray-200">💾 JSON</button>
-                <button onClick={() => exportAsMarkdown(data as any)} className="px-3 py-1.5 bg-gray-100 text-gray-800 text-sm rounded-md hover:bg-gray-200">📝 Markdown</button>
                 {data.shotList && data.shotList.length > 0 && (
                     <button onClick={() => exportShotListAsCSV(data as any)} className="px-3 py-1.5 bg-gray-100 text-gray-800 text-sm rounded-md hover:bg-gray-200">📊 Shot List CSV</button>
                 )}
@@ -1399,9 +1347,10 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
 // --- MAIN APP COMPONENT ---
 
 export default function BriefBuilder() {
-    const { role, currentStep, briefData, setRole, setCurrentStep, updateBriefData, getCompletionPercentage, getMissingRequiredFields, isDirty, lastSaved, markSaved } = useBriefStore();
+    const { role, currentStep, briefData, setRole, setCurrentStep, updateBriefData, getCompletionPercentage, getMissingRequiredFields, isDirty, lastSaved, markSaved, resetBrief } = useBriefStore();
     const [formData, setFormData] = useState<FormData>({});
     const [darkMode, setDarkMode] = useState(false);
+    const [showResetConfirm, setShowResetConfirm] = useState(false);
 
     // enable auto-save and before-unload warning
     useAutoSave(30000);
@@ -1425,6 +1374,17 @@ export default function BriefBuilder() {
             document.documentElement.classList.remove('dark');
             localStorage.setItem('theme', 'light');
         }
+    };
+
+    const handleResetBrief = () => {
+        setShowResetConfirm(true);
+    };
+
+    const confirmReset = () => {
+        resetBrief();
+        setWizardStarted(false);
+        setShowResetConfirm(false);
+        setFormData({});
     };
 
     // Keep formData in sync with briefData
@@ -1583,9 +1543,18 @@ export default function BriefBuilder() {
             <div className="max-w-6xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden md:flex">
                 {/* Sidebar / Progress Bar */}
                 <div className="md:w-1/3 bg-gray-50 p-8 border-r border-gray-200 dark:bg-slate-900 dark:border-slate-800">
-                    <h1 className="text-2xl font-bold text-gray-900 mb-2 dark:text-white">
-                        {formData.userRole === 'Client' ? 'Project Inquiry' : 'Photography Brief'}
-                    </h1>
+                    <div className="flex items-center justify-between mb-2">
+                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                            {formData.userRole === 'Client' ? 'Project Inquiry' : 'Photography Brief'}
+                        </h1>
+                        <button 
+                            onClick={handleResetBrief} 
+                            className="px-2 py-1 text-xs rounded border border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20 transition-colors"
+                            title="Start a new brief"
+                        >
+                            🗑️ New Brief
+                        </button>
+                    </div>
                     <div className="flex items-center justify-between mb-3">
                         <p className="text-gray-600 dark:text-slate-300">Created by <span className="font-semibold">{formData.clientName || formData.userRole}</span></p>
                         <button onClick={toggleDark} className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-slate-700 dark:text-slate-200">
@@ -1666,6 +1635,37 @@ export default function BriefBuilder() {
               }
             `}
             </style>
+
+            {/* Reset Confirmation Modal */}
+            {showResetConfirm && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4" onClick={() => setShowResetConfirm(false)}>
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center mb-4">
+                            <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mr-4">
+                                <span className="text-2xl">⚠️</span>
+                            </div>
+                            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Start a New Brief?</h2>
+                        </div>
+                        <p className="text-gray-600 dark:text-gray-300 mb-6">
+                            This will clear all current data and start fresh. Make sure you've saved or exported your current brief if needed.
+                        </p>
+                        <div className="flex justify-end gap-3">
+                            <button 
+                                onClick={() => setShowResetConfirm(false)} 
+                                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                onClick={confirmReset} 
+                                className="px-4 py-2 bg-red-600 text-white font-semibold rounded-md hover:bg-red-700 transition-colors shadow-sm"
+                            >
+                                Yes, Start New Brief
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

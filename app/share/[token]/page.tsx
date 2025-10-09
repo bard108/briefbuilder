@@ -118,6 +118,8 @@ export default function SharePage() {
         {(briefData.shootDates || briefData.location) && (
           <Section title="Shoot Details">
             <InfoRow label="Date(s)" value={briefData.shootDates} />
+            <InfoRow label="Start Time" value={briefData.shootStartTime} />
+            <InfoRow label="Finish Time" value={briefData.shootFinishTime} />
             <InfoRow label="Status" value={briefData.shootStatus} />
             <InfoRow label="Location" value={briefData.location} />
             {briefData.locationDetails && (

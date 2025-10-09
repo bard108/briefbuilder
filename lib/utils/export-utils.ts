@@ -27,12 +27,11 @@ export function exportShotListAsCSV(data: FormData): void {
     'Description',
     'Shot Type',
     'Angle',
+    'Orientation',
     'Priority',
     'Category',
-    'Est. Time (min)',
     'Equipment',
     'Notes',
-    'Status',
   ];
 
   const rows = data.shotList.map((shot, index) => [
@@ -40,12 +39,11 @@ export function exportShotListAsCSV(data: FormData): void {
     shot.description.replace(/"/g, '""'),
     shot.shotType,
     shot.angle,
+    shot.orientation || 'Any',
     shot.priority ? 'Yes' : 'No',
     shot.category || '',
-    shot.estimatedTime?.toString() || '',
     shot.equipment?.join('; ') || '',
     shot.notes.replace(/"/g, '""'),
-    shot.status || 'Not Started',
   ]);
 
   const csv = [
@@ -154,8 +152,8 @@ export function exportAsMarkdown(data: FormData): void {
       md += `### Shot ${index + 1}${shot.priority ? ' ⭐' : ''}\n\n`;
       md += `**Description:** ${shot.description}  \n`;
       md += `**Type:** ${shot.shotType} | **Angle:** ${shot.angle}  \n`;
+      if (shot.orientation) md += `**Orientation:** ${shot.orientation}  \n`;
       if (shot.category) md += `**Category:** ${shot.category}  \n`;
-      if (shot.estimatedTime) md += `**Est. Time:** ${shot.estimatedTime} min  \n`;
       if (shot.equipment && shot.equipment.length > 0) {
         md += `**Equipment:** ${shot.equipment.join(', ')}  \n`;
       }

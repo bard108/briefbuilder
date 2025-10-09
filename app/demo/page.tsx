@@ -248,9 +248,9 @@ export default function DemoPage() {
                             description: '',
                             shotType: 'Medium' as const,
                             angle: 'Eye-level' as const,
+                            orientation: 'Any' as const,
                             priority: false,
                             notes: '',
-                            status: 'Not Started' as const,
                             order: (formData.shotList?.length || 0) + 1,
                           };
                           updateFormData('shotList', [
