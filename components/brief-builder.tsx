@@ -1535,7 +1535,7 @@ export default function BriefBuilder() {
         updateBriefData({ userRole: selectedRole });
         setSteps(buildStepsForRole(selectedRole));
         setWizardStarted(true);
-        setCurrentStep(1);
+        setCurrentStep(0); // Start at first step (Your Information)
     };
 
     useEffect(() => {

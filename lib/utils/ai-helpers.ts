@@ -163,7 +163,7 @@ Target Audience: "${data.audience || 'Not specified'}"`;
 - description: Clear, specific shot description
 - shotType: One of "Wide", "Medium", "Close-up", "Detail", "Overhead"
 - angle: One of "Eye-level", "High Angle", "Low Angle", "Dutch Angle"
-- orientation: One of "Portrait", "Landscape", "Square", "Any"
+- orientation: One of "Landscape (16:9)", "Landscape (3:2)", "Landscape (4:3)", "Portrait (9:16)", "Portrait (2:3)", "Portrait (4:5)", "Square (1:1)", "Any"
 - notes: Technical notes, lighting suggestions, or creative direction
 - category: Shot category (e.g., "Hero", "Details", "Lifestyle", "Product", "Atmosphere")
 - priority: Boolean - is this a must-have shot based on objectives?
@@ -196,7 +196,6 @@ Return as JSON array.`;
         id: Date.now() + index,
         priority: shot.priority || false,
         orientation: shot.orientation || 'Any',
-        quantity: 1,
         order: (data.shotList?.length || 0) + index + 1,
         equipment: [],
       }));
@@ -251,7 +250,7 @@ For each shot, provide:
 - description: Clear, actionable shot description
 - shotType: One of "Wide", "Medium", "Close-up", "Detail", "Overhead"
 - angle: One of "Eye-level", "High Angle", "Low Angle", "Dutch Angle"
-- orientation: One of "Portrait", "Landscape", "Square", "Any"
+- orientation: One of "Landscape (16:9)", "Landscape (3:2)", "Landscape (4:3)", "Portrait (9:16)", "Portrait (2:3)", "Portrait (4:5)", "Square (1:1)", "Any"
 - notes: How this relates to the reference images (lighting, composition, mood)
 - category: Shot category
 - priority: Boolean - critical shot?
@@ -284,7 +283,6 @@ Return as JSON array.`;
         id: Date.now() + index,
         priority: false,
         orientation: shot.orientation || 'Any',
-        quantity: 1,
         order: index + 1,
         equipment: [],
       }));

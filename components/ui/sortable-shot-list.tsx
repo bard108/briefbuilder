@@ -149,16 +149,20 @@ function SortableItem({ shot, index, onUpdate, onRemove, onDuplicate }: Sortable
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Orientation
+                  Orientation & Aspect Ratio
                 </label>
                 <select
                   value={shot.orientation || 'Any'}
                   onChange={(e) => onUpdate(shot.id, 'orientation', e.target.value)}
                   className="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                 >
-                  <option>Portrait</option>
-                  <option>Landscape</option>
-                  <option>Square</option>
+                  <option>Landscape (16:9)</option>
+                  <option>Landscape (3:2)</option>
+                  <option>Landscape (4:3)</option>
+                  <option>Portrait (9:16)</option>
+                  <option>Portrait (2:3)</option>
+                  <option>Portrait (4:5)</option>
+                  <option>Square (1:1)</option>
                   <option>Any</option>
                 </select>
               </div>

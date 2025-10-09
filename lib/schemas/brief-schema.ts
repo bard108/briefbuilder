@@ -6,7 +6,16 @@ export const shotSchema = z.object({
   description: z.string(),
   shotType: z.enum(['Wide', 'Medium', 'Close-up', 'Detail', 'Overhead', 'Other']),
   angle: z.enum(['Eye-level', 'High Angle', 'Low Angle', 'Dutch Angle', 'Other']),
-  orientation: z.enum(['Portrait', 'Landscape', 'Square', 'Any']).optional(),
+  orientation: z.enum([
+    'Landscape (16:9)',
+    'Landscape (3:2)', 
+    'Landscape (4:3)',
+    'Portrait (9:16)',
+    'Portrait (2:3)',
+    'Portrait (4:5)',
+    'Square (1:1)',
+    'Any'
+  ]).optional(),
   priority: z.boolean(),
   notes: z.string(),
   category: z.string().optional(),
