@@ -196,6 +196,7 @@ Return as JSON array.`;
         id: Date.now() + index,
         priority: shot.priority || false,
         orientation: shot.orientation || 'Any',
+        quantity: 1,
         order: (data.shotList?.length || 0) + index + 1,
         equipment: [],
       }));
@@ -283,6 +284,7 @@ Return as JSON array.`;
         id: Date.now() + index,
         priority: false,
         orientation: shot.orientation || 'Any',
+        quantity: 1,
         order: index + 1,
         equipment: [],
       }));

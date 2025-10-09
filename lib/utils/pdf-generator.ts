@@ -42,14 +42,26 @@ export async function generateEnhancedPDF(
 
     let currentY = margin;
 
-    // Helper to add header/footer
+    // Helper to add header/footer with improved styling
     const addHeaderFooter = (pageNum: number, totalPages: number) => {
-      // Header
-      pdf.setFontSize(8);
-      pdf.setTextColor(150);
+      // Header with line
+      pdf.setDrawColor(79, 70, 229); // Indigo color
+      pdf.setLineWidth(0.5);
+      pdf.line(margin, 12, pageWidth - margin, 12);
+      
+      pdf.setFontSize(9);
+      pdf.setTextColor(79, 70, 229);
+      pdf.setFont('helvetica', 'bold');
       pdf.text(data.projectName || 'Photography Brief', margin, 10);
       
-      // Footer
+      // Footer with line
+      pdf.setDrawColor(220, 220, 220);
+      pdf.setLineWidth(0.3);
+      pdf.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
+      
+      pdf.setFontSize(8);
+      pdf.setTextColor(100);
+      pdf.setFont('helvetica', 'normal');
       pdf.text(
         `Page ${pageNum} of ${totalPages}`,
         pageWidth / 2,
@@ -66,7 +78,8 @@ export async function generateEnhancedPDF(
       // Watermark
       if (includeWatermark) {
         pdf.setFontSize(60);
-        pdf.setTextColor(200, 200, 200);
+        pdf.setTextColor(240, 240, 240);
+        pdf.setFont('helvetica', 'bold');
         pdf.text(
           watermarkText,
           pageWidth / 2,
@@ -76,56 +89,75 @@ export async function generateEnhancedPDF(
       }
     };
 
-    // Cover Page
+    // Enhanced Cover Page
     if (includeCoverPage) {
-      pdf.setFillColor(brandColor);
-      pdf.rect(0, 0, pageWidth, 80, 'F');
+      // Gradient-like effect with multiple rectangles
+      pdf.setFillColor(79, 70, 229); // Indigo 600
+      pdf.rect(0, 0, pageWidth, pageHeight, 'F');
+      
+      // Lighter overlay for depth
+      pdf.setFillColor(99, 102, 241); // Indigo 500
+      pdf.rect(0, pageHeight * 0.3, pageWidth, pageHeight * 0.7, 'F');
 
       if (logoUrl) {
         try {
-          pdf.addImage(logoUrl, 'PNG', margin, 20, 40, 20);
+          pdf.addImage(logoUrl, 'PNG', margin, 25, 40, 20);
         } catch (e) {
           console.warn('Could not add logo to PDF');
         }
       }
 
-      pdf.setTextColor(255);
-      pdf.setFontSize(32);
-      pdf.text(data.projectName || 'Photography Brief', pageWidth / 2, 120, {
-        align: 'center',
-      });
+      // Main title
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(36);
+      const title = data.projectName || 'Photography Brief';
+      pdf.text(title, pageWidth / 2, pageHeight * 0.35, { align: 'center' });
 
-      pdf.setFontSize(14);
-      pdf.text(
-        `Created by ${data.clientName || 'Unknown'}`,
-        pageWidth / 2,
-        135,
-        { align: 'center' }
-      );
-
-      pdf.setTextColor(100);
-      pdf.setFontSize(12);
-      pdf.text(
-        new Date().toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-        }),
-        pageWidth / 2,
-        145,
-        { align: 'center' }
-      );
-
-      // Project overview on cover
-      if (data.overview) {
-        pdf.setTextColor(60);
-        pdf.setFontSize(11);
-        const overviewLines = pdf.splitTextToSize(
-          data.overview,
-          pageWidth - 2 * margin
-        );
-        pdf.text(overviewLines, pageWidth / 2, 165, { align: 'center' });
+      // Subtitle with type
+      if (data.projectType) {
+        pdf.setFontSize(16);
+        pdf.setFont('helvetica', 'normal');
+        pdf.text(data.projectType, pageWidth / 2, pageHeight * 0.42, { align: 'center' });
       }
+
+      // Created by section
+      pdf.setFontSize(12);
+      pdf.setTextColor(220, 220, 255);
+      const createdBy = data.clientName ? `Created by ${data.clientName}` : '';
+      const company = data.clientCompany ? `${data.clientCompany}` : '';
+      if (createdBy) pdf.text(createdBy, pageWidth / 2, pageHeight * 0.52, { align: 'center' });
+      if (company) pdf.text(company, pageWidth / 2, pageHeight * 0.56, { align: 'center' });
+
+      // Date
+      pdf.setFontSize(10);
+      pdf.setTextColor(200, 200, 220);
+      const dateStr = new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+      pdf.text(dateStr, pageWidth / 2, pageHeight * 0.63, { align: 'center' });
+
+      // Project overview box
+      if (data.overview) {
+        pdf.setFillColor(255, 255, 255);
+        const boxHeight = 50;
+        const boxY = pageHeight * 0.72;
+        pdf.roundedRect(margin + 5, boxY, pageWidth - 2 * margin - 10, boxHeight, 3, 3, 'F');
+        
+        pdf.setTextColor(30, 30, 30);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(10);
+        const overviewLines = pdf.splitTextToSize(data.overview, pageWidth - 2 * margin - 20);
+        pdf.text(overviewLines, pageWidth / 2, boxY + 8, { align: 'center', maxWidth: pageWidth - 2 * margin - 20 });
+      }
+
+      // Footer on cover
+      pdf.setFontSize(8);
+      pdf.setTextColor(180, 180, 200);
+      pdf.setFont('helvetica', 'italic');
+      pdf.text('Professional Photography Brief', pageWidth / 2, pageHeight - 10, { align: 'center' });
 
       pdf.addPage();
     }

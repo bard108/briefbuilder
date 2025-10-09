@@ -49,6 +49,12 @@ interface FormData {
   fileTypes?: string[];
   usageRights?: string[];
   socialPlatforms?: string[];
+  // Video-specific fields
+  videoDuration?: string;
+  videoFrameRate?: string;
+  videoResolution?: string;
+  videoOrientation?: string[];
+  motionRequirements?: string;
   shotList?: Shot[];
   crew?: CrewMember[];
   schedule?: string;
@@ -658,21 +664,27 @@ const MoodboardStep = ({ data, updateData }: StepProps) => {
 
 const DeliverablesStep = ({ data, updateData }: StepProps) => {
     const deliverableOptions = [
-        { id: 'photography', label: 'Photography' }, { id: 'video', label: 'Video' },
-        { id: 'socialAssets', label: 'Social Assets' }, { id: 'other', label: 'Other' },
+        { id: 'photography', label: 'Photography (includes social assets)' },
+        { id: 'video', label: 'Video (includes social video)' },
+        { id: 'btsContent', label: 'Behind-the-Scenes Content' },
     ];
     const fileTypeOptions = [
-        { id: 'jpeg', label: 'JPEG' }, { id: 'tiff', label: 'TIFF' },
-        { id: 'psd', label: 'PSD' }, { id: 'indesign', label: 'InDesign/PDF' },
+        { id: 'jpeg', label: 'JPEG' }, { id: 'png', label: 'PNG' }, { id: 'tiff', label: 'TIFF' },
+        { id: 'raw', label: 'RAW' }, { id: 'psd', label: 'PSD' }, { id: 'dng', label: 'DNG' },
     ];
     const usageRightsOptions = [
         { id: 'print', label: 'Print' }, { id: 'website', label: 'Website' }, { id: 'social', label: 'Social Media' },
-        { id: 'advertising', label: 'Advertising' }, { id: 'internal', label: 'Internal Use' }, { id: 'other', label: 'Other' }
+        { id: 'advertising', label: 'Advertising' }, { id: 'editorial', label: 'Editorial' }, { id: 'internal', label: 'Internal Use' }
     ];
     const socialPlatformOptions = [
-        { id: 'igFeed', label: 'Instagram Feed (1:1, 4:5)' }, { id: 'igStory', label: 'Instagram Story (9:16)' },
+        { id: 'igFeed', label: 'Instagram Feed (1:1, 4:5)' }, { id: 'igStory', label: 'Instagram Story/Reels (9:16)' },
         { id: 'facebookPost', label: 'Facebook Post' }, { id: 'linkedinPost', label: 'LinkedIn Post' },
-        { id: 'twitterPost', label: 'X / Twitter Post' }, { id: 'otherSocial', label: 'Other' },
+        { id: 'tiktok', label: 'TikTok (9:16)' }, { id: 'youtube', label: 'YouTube' },
+        { id: 'twitterPost', label: 'X / Twitter Post' },
+    ];
+    const videoOrientationOptions = [
+        { id: 'landscape', label: 'Landscape (16:9)' }, { id: 'portrait', label: 'Portrait (9:16)' },
+        { id: 'square', label: 'Square (1:1)' },
     ];
 
     const handleCheckboxChange = (group: keyof FormData, id: string) => {
@@ -696,14 +708,48 @@ const DeliverablesStep = ({ data, updateData }: StepProps) => {
                     <div className="space-y-6">
                         <CheckboxGroup legend="Required File Formats" options={fileTypeOptions} selectedOptions={data.fileTypes || []} onChange={(id) => handleCheckboxChange('fileTypes', id)} />
                         <CheckboxGroup legend="Image Usage Rights" options={usageRightsOptions} selectedOptions={data.usageRights || []} onChange={(id) => handleCheckboxChange('usageRights', id)} />
+                        <CheckboxGroup legend="Social Media Platforms (if applicable)" options={socialPlatformOptions} selectedOptions={data.socialPlatforms || []} onChange={(id) => handleCheckboxChange('socialPlatforms', id)} />
                     </div>
                 </div>
             )}
 
-            {data.deliverables?.includes('socialAssets') && (
-                <div className="space-y-8 p-6 bg-gray-50 rounded-lg border border-gray-200 animate-fade-in">
-                    <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Social Assets Specifics</h3>
-                    <CheckboxGroup legend="Required Social Platforms / Aspect Ratios" options={socialPlatformOptions} selectedOptions={data.socialPlatforms || []} onChange={(id) => handleCheckboxChange('socialPlatforms', id)} />
+            {data.deliverables?.includes('video') && (
+                <div className="space-y-8 p-6 bg-indigo-50 rounded-lg border border-indigo-200 animate-fade-in">
+                    <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Video Specifics</h3>
+                    <div className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <Input 
+                                label="Video Duration" 
+                                id="videoDuration" 
+                                placeholder="e.g., 30 seconds, 1-2 minutes" 
+                                value={data.videoDuration || ''} 
+                                onChange={(e) => updateData('videoDuration', e.target.value)} 
+                            />
+                            <Input 
+                                label="Frame Rate" 
+                                id="videoFrameRate" 
+                                placeholder="e.g., 24fps, 30fps, 60fps" 
+                                value={data.videoFrameRate || ''} 
+                                onChange={(e) => updateData('videoFrameRate', e.target.value)} 
+                            />
+                            <Input 
+                                label="Resolution" 
+                                id="videoResolution" 
+                                placeholder="e.g., 4K, 1080p, 720p" 
+                                value={data.videoResolution || ''} 
+                                onChange={(e) => updateData('videoResolution', e.target.value)} 
+                            />
+                        </div>
+                        <CheckboxGroup legend="Video Orientation" options={videoOrientationOptions} selectedOptions={data.videoOrientation || []} onChange={(id) => handleCheckboxChange('videoOrientation' as any, id)} />
+                        <CheckboxGroup legend="Social Media Platforms (if applicable)" options={socialPlatformOptions} selectedOptions={data.socialPlatforms || []} onChange={(id) => handleCheckboxChange('socialPlatforms', id)} />
+                        <Textarea 
+                            label="Motion & Animation Requirements" 
+                            id="motionRequirements" 
+                            placeholder="Describe motion capture needs (e.g., drizzle, steam, pouring, slow-mo action)..." 
+                            value={data.motionRequirements || ''} 
+                            onChange={(e) => updateData('motionRequirements', e.target.value)} 
+                        />
+                    </div>
                 </div>
             )}
             
@@ -1013,31 +1059,69 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
                 content.style.background = '#ffffff';
                 content.style.color = '#0b1220';
 
-                const addSection = (label: string, text: string | null | undefined) => {
+                const addSection = (label: string, text: string | null | undefined, isMainSection = false) => {
                     if (!text) return;
                     const wrap = document.createElement('div');
-                    wrap.style.marginBottom = '12px';
+                    wrap.style.marginBottom = isMainSection ? '20px' : '14px';
+                    wrap.style.paddingBottom = isMainSection ? '12px' : '0';
+                    wrap.style.borderBottom = isMainSection ? '2px solid #e0e7ff' : 'none';
+                    
                     const lh = document.createElement('div');
                     lh.textContent = label;
-                    lh.style.fontWeight = '600';
-                    lh.style.marginBottom = '6px';
-                    lh.style.color = '#0b1220';
+                    lh.style.fontWeight = isMainSection ? '700' : '600';
+                    lh.style.fontSize = isMainSection ? '15px' : '13px';
+                    lh.style.marginBottom = '8px';
+                    lh.style.color = isMainSection ? '#4f46e5' : '#1e293b';
+                    lh.style.textTransform = isMainSection ? 'uppercase' : 'none';
+                    lh.style.letterSpacing = isMainSection ? '0.5px' : 'normal';
+                    
                     const p = document.createElement('div');
                     p.textContent = text;
                     p.style.whiteSpace = 'pre-wrap';
+                    p.style.color = '#475569';
+                    p.style.lineHeight = '1.6';
                     wrap.appendChild(lh);
                     wrap.appendChild(p);
                     content.appendChild(wrap);
                 };
 
-                addSection('Project Name', data.projectName);
-                addSection('Overview', data.overview);
-                addSection('Objectives', data.objectives);
-                addSection('Dates', data.shootDates);
-                addSection('Location', data.location);
-                if (Array.isArray(data.deliverables) && data.deliverables.length) addSection('Deliverables', data.deliverables.join(', '));
-                if (Array.isArray(data.shotList) && data.shotList.length) addSection('Shot List', data.shotList.map((s, i) => `${i + 1}. ${s.description}`).join('\n'));
-                if (data.budgetEstimate) addSection('Estimated Budget', `Total: ${new Intl.NumberFormat(undefined, { style: 'currency', currency: data.currency || 'USD' }).format(data.budgetEstimate.total)}`);
+                // Project Details Section
+                addSection('Project Overview', data.projectName ? `${data.projectName}${data.projectType ? ' - ' + data.projectType : ''}` : data.projectType, true);
+                addSection('Brief', data.overview);
+                addSection('Key Objectives', data.objectives);
+                addSection('Target Audience', data.audience);
+                
+                // Shoot Details Section
+                if (data.shootDates || data.location) {
+                    addSection('Shoot Details', '', true);
+                    addSection('Date', data.shootDates ? `${data.shootDates}${data.shootStartTime ? ' (Start: ' + data.shootStartTime + ')' : ''}` : undefined);
+                    addSection('Location', data.location);
+                }
+                
+                // Deliverables Section
+                if (Array.isArray(data.deliverables) && data.deliverables.length) {
+                    addSection('Deliverables', '', true);
+                    addSection('Required Assets', data.deliverables.join(', '));
+                    if (data.fileTypes?.length) addSection('File Formats', data.fileTypes.join(', '));
+                    if (data.usageRights?.length) addSection('Usage Rights', data.usageRights.join(', '));
+                }
+                
+                // Shot List Section
+                if (Array.isArray(data.shotList) && data.shotList.length) {
+                    addSection('Shot List', '', true);
+                    const shotSummary = data.shotList.map((s, i) => {
+                        const priority = s.priority ? '⭐ ' : '';
+                        const qty = s.quantity && s.quantity > 1 ? ` (×${s.quantity})` : '';
+                        return `${i + 1}. ${priority}${s.description}${qty}`;
+                    }).join('\n');
+                    addSection('Shots', shotSummary);
+                }
+                
+                // Budget Section
+                if (data.budgetEstimate) {
+                    addSection('Budget', '', true);
+                    addSection('Estimated Total', `${new Intl.NumberFormat(undefined, { style: 'currency', currency: data.currency || 'USD' }).format(data.budgetEstimate.total)}`);
+                }
 
                 safe.appendChild(title);
                 safe.appendChild(content);

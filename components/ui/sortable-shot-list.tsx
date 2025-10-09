@@ -90,6 +90,11 @@ function SortableItem({ shot, index, onUpdate, onRemove, onDuplicate }: Sortable
                 MUST-HAVE
               </span>
             )}
+            {shot.quantity && shot.quantity > 1 && (
+              <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded-full">
+                ×{shot.quantity} versions
+              </span>
+            )}
           </div>
 
           <div className="space-y-3">
@@ -159,17 +164,33 @@ function SortableItem({ shot, index, onUpdate, onRemove, onDuplicate }: Sortable
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Category (optional)
-              </label>
-              <input
-                type="text"
-                value={shot.category || ''}
-                onChange={(e) => onUpdate(shot.id, 'category', e.target.value)}
-                placeholder="e.g., Hero, Details, Lifestyle"
-                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Category (optional)
+                </label>
+                <input
+                  type="text"
+                  value={shot.category || ''}
+                  onChange={(e) => onUpdate(shot.id, 'category', e.target.value)}
+                  placeholder="e.g., Hero, Details, Lifestyle"
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Quantity (optional)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={shot.quantity || ''}
+                  onChange={(e) => onUpdate(shot.id, 'quantity', parseInt(e.target.value) || undefined)}
+                  placeholder="# of versions"
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                />
+              </div>
             </div>
 
             <div>
@@ -237,6 +258,8 @@ interface SortableShotListProps {
 }
 
 export function SortableShotList({ shots, onShotsChange }: SortableShotListProps) {
+  const [collapsedCategories, setCollapsedCategories] = React.useState<Set<string>>(new Set());
+
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -278,6 +301,28 @@ export function SortableShotList({ shots, onShotsChange }: SortableShotListProps
     onShotsChange([...shots, newShot]);
   };
 
+  const toggleCategory = (category: string) => {
+    const newCollapsed = new Set(collapsedCategories);
+    if (newCollapsed.has(category)) {
+      newCollapsed.delete(category);
+    } else {
+      newCollapsed.add(category);
+    }
+    setCollapsedCategories(newCollapsed);
+  };
+
+  // Group shots by category
+  const groupedShots = shots.reduce((acc, shot, index) => {
+    const category = shot.category || 'Uncategorized';
+    if (!acc[category]) {
+      acc[category] = [];
+    }
+    acc[category].push({ shot, index });
+    return acc;
+  }, {} as Record<string, Array<{ shot: Shot; index: number }>>);
+
+  const hasCategories = Object.keys(groupedShots).length > 1 || !groupedShots['Uncategorized'];
+
   return (
     <DndContext
       sensors={sensors}
@@ -288,17 +333,71 @@ export function SortableShotList({ shots, onShotsChange }: SortableShotListProps
         items={shots.map((s) => s.id)}
         strategy={verticalListSortingStrategy}
       >
-        <div className="space-y-4">
-          {shots.map((shot, index) => (
-            <SortableItem
-              key={shot.id}
-              shot={shot}
-              index={index}
-              onUpdate={handleUpdate}
-              onRemove={handleRemove}
-              onDuplicate={handleDuplicate}
-            />
-          ))}
+        <div className="space-y-6">
+          {!hasCategories ? (
+            // If no categories, show flat list
+            <div className="space-y-4">
+              {shots.map((shot, index) => (
+                <SortableItem
+                  key={shot.id}
+                  shot={shot}
+                  index={index}
+                  onUpdate={handleUpdate}
+                  onRemove={handleRemove}
+                  onDuplicate={handleDuplicate}
+                />
+              ))}
+            </div>
+          ) : (
+            // Show grouped by category
+            Object.entries(groupedShots).map(([category, categoryShots]) => {
+              const isCollapsed = collapsedCategories.has(category);
+              const priorityCount = categoryShots.filter(({ shot }) => shot.priority).length;
+              
+              return (
+                <div key={category} className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                  <button
+                    onClick={() => toggleCategory(category)}
+                    className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-3">
+                      <svg
+                        className={`w-5 h-5 text-gray-500 transition-transform ${isCollapsed ? '' : 'rotate-90'}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                      <h3 className="font-semibold text-gray-800">{category}</h3>
+                      <span className="text-sm text-gray-500">
+                        ({categoryShots.length} shot{categoryShots.length !== 1 ? 's' : ''})
+                      </span>
+                      {priorityCount > 0 && (
+                        <span className="text-xs font-bold text-indigo-600 bg-indigo-100 px-2 py-1 rounded-full">
+                          {priorityCount} must-have
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                  {!isCollapsed && (
+                    <div className="p-4 space-y-4">
+                      {categoryShots.map(({ shot, index }) => (
+                        <SortableItem
+                          key={shot.id}
+                          shot={shot}
+                          index={index}
+                          onUpdate={handleUpdate}
+                          onRemove={handleRemove}
+                          onDuplicate={handleDuplicate}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
         </div>
       </SortableContext>
     </DndContext>

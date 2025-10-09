@@ -10,6 +10,7 @@ export const shotSchema = z.object({
   priority: z.boolean(),
   notes: z.string(),
   category: z.string().optional(),
+  quantity: z.number().optional(), // Number of versions/variations needed
   equipment: z.array(z.string()).optional(),
   referenceImage: z.string().optional(), // URL or data URL
   order: z.number().optional(),
@@ -129,6 +130,13 @@ export const formDataSchema = z.object({
   fileTypes: z.array(z.string()).optional(),
   usageRights: z.array(z.string()).optional(),
   socialPlatforms: z.array(z.string()).optional(),
+  
+  // Video-Specific Requirements
+  videoDuration: z.string().optional(), // e.g., "30 seconds", "1-2 minutes"
+  videoFrameRate: z.string().optional(), // e.g., "24fps", "30fps", "60fps"
+  videoResolution: z.string().optional(), // e.g., "4K", "1080p"
+  videoOrientation: z.array(z.string()).optional(), // Portrait, Landscape, Square
+  motionRequirements: z.string().optional(), // Description of motion/animation needs
   
   // Post-Production Requirements
   editingRequirements: z.string().optional(),
