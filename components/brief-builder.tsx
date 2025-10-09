@@ -999,11 +999,26 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
             // Give time for any dynamic content to render
             await new Promise(resolve => setTimeout(resolve, 500));
             
-            // Ensure the element is visible
-            briefContentRef.current.style.display = 'block';
-            briefContentRef.current.style.visibility = 'visible';
+            // Create a clone of the content for PDF generation
+            const pdfContent = briefContentRef.current.cloneNode(true) as HTMLElement;
             
-            await generateEnhancedPDF(data as any, briefContentRef.current, {
+            // Force all modern color values to standard RGB
+            const styleElements = pdfContent.querySelectorAll('*[style]');
+            styleElements.forEach(el => {
+                const style = (el as HTMLElement).style;
+                if (style.color?.includes('oklch')) {
+                    style.color = window.getComputedStyle(el).color;
+                }
+                if (style.backgroundColor?.includes('oklch')) {
+                    style.backgroundColor = window.getComputedStyle(el).backgroundColor;
+                }
+            });
+            
+            // Ensure the element is visible
+            pdfContent.style.display = 'block';
+            pdfContent.style.visibility = 'visible';
+            
+            await generateEnhancedPDF(data as any, pdfContent, {
                 includeCoverPage: true,
                 includeWatermark: false,
                 brandColor: '#4f46e5',
@@ -1065,24 +1080,30 @@ const ReviewStep = ({ data, scriptsLoaded }: ReviewStepProps) => {
             <h2 className="text-2xl font-bold text-gray-800">Review & Distribute</h2>
             <p className="text-gray-600">Please review all the details below. Once you&apos;re happy, choose how you&apos;d like to share or save the document.</p>
 
-            <div id="brief-content-for-pdf" ref={briefContentRef} className="space-y-6 p-6 bg-white rounded-lg border border-gray-200">
-                <div className="flex items-baseline justify-between mb-2">
-                    <h1 className="text-xl font-bold text-gray-900">{data.projectName || 'Untitled Brief'}</h1>
-                    <div className="text-xs text-gray-500">Created by {data.clientName || data.userRole || 'Unknown'} • {new Date().toLocaleDateString()}</div>
+            <div id="brief-content-for-pdf" ref={briefContentRef} style={{
+                padding: '1.5rem',
+                backgroundColor: '#ffffff',
+                borderRadius: '0.5rem',
+                border: '1px solid #e5e7eb',
+                marginBottom: '1.5rem'
+            }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.5rem' }}>
+                    <h1 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#111827' }}>{data.projectName || 'Untitled Brief'}</h1>
+                    <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Created by {data.clientName || data.userRole || 'Unknown'} • {new Date().toLocaleDateString()}</div>
                 </div>
-                <div className="h-px bg-gray-200" />
+                <div style={{ height: '1px', backgroundColor: '#e5e7eb' }} />
 
                 {(data.projectName || data.projectType || data.budget || data.overview || data.objectives || data.audience) && (
                     <div>
-                        <h3 className="text-lg font-semibold text-gray-800 mb-2">Project Details</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-700">
-                            {data.projectName && <div><span className="font-medium">Project Name:</span> {data.projectName}</div>}
-                            {data.projectType && <div><span className="font-medium">Project Type:</span> {data.projectType}</div>}
-                            {data.budget && <div><span className="font-medium">Budget:</span> {data.budget}</div>}
+                        <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#1f2937', marginBottom: '0.5rem' }}>Project Details</h3>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.875rem', color: '#374151' }}>
+                            {data.projectName && <div><span style={{ fontWeight: '500' }}>Project Name:</span> {data.projectName}</div>}
+                            {data.projectType && <div><span style={{ fontWeight: '500' }}>Project Type:</span> {data.projectType}</div>}
+                            {data.budget && <div><span style={{ fontWeight: '500' }}>Budget:</span> {data.budget}</div>}
                         </div>
-                        {data.overview && <p className="mt-2 text-sm text-gray-700"><span className="font-medium">Overview:</span> {data.overview}</p>}
-                        {data.objectives && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Objectives:</span><br/>{data.objectives}</p>}
-                        {data.audience && <p className="mt-1 text-sm text-gray-700"><span className="font-medium">Audience:</span> {data.audience}</p>}
+                        {data.overview && <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#374151' }}><span style={{ fontWeight: '500' }}>Overview:</span> {data.overview}</p>}
+                        {data.objectives && <p style={{ marginTop: '0.25rem', fontSize: '0.875rem', color: '#374151' }}><span style={{ fontWeight: '500' }}>Objectives:</span><br/>{data.objectives}</p>}
+                        {data.audience && <p style={{ marginTop: '0.25rem', fontSize: '0.875rem', color: '#374151' }}><span style={{ fontWeight: '500' }}>Audience:</span> {data.audience}</p>}
                     </div>
                 )}
 
